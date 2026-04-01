@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* You can add your custom font imports here later (like Inter or Merriweather) */
+body {
+  background-color: #FAFAFA; /* Your soft ivory fallback */
+}
