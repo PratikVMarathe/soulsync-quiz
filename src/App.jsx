@@ -3,12 +3,14 @@ import { previewQuiz } from './data/previewQuiz';
 import { normalizeQuiz } from './utils/normalizeQuiz';
 import AiGuideCard from './components/AiGuideCard';
 import ProgressHeader from './components/ProgressHeader';
+import QuizStatusView from './components/QuizStatusView';
 import QuestionCard from './components/QuestionCard';
 import QuizIntro from './components/QuizIntro';
 import QuizSidebar from './components/QuizSidebar';
 import QuizTopbar from './components/QuizTopbar';
 import TimerCard from './components/TimerCard';
 import WisdomPanel from './components/WisdomPanel';
+import { resolveQuizErrorState } from './utils/resolveQuizErrorState';
 import './index.css';
 
 export default function App({ user, quizId, onExit, isEmbedded = false }) {
@@ -19,6 +21,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   const [hasStarted, setHasStarted] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!quizId) return undefined;
@@ -55,11 +58,13 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
       } catch (fetchError) {
         console.error('Failed to load quiz:', fetchError);
         if (!ignoreResult) {
-          setError(
-            fetchError.code === 'permission-denied'
-              ? 'Your account does not have permission to read this concept. Check the Firestore rules for quizzes.'
-              : fetchError.message || 'Failed to load this concept.',
-          );
+          setError(resolveQuizErrorState(fetchError, fetchError.code === 'permission-denied'
+            ? {
+                message: 'Your account does not have permission to read this concept. Check the Firestore rules for quizzes.',
+                statusCode: 403,
+                title: 'Concept Access Restricted',
+              }
+            : undefined));
         }
       } finally {
         if (!ignoreResult) setLoading(false);
@@ -71,7 +76,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     return () => {
       ignoreResult = true;
     };
-  }, [quizId]);
+  }, [quizId, reloadToken]);
 
   const quiz = useMemo(() => normalizeQuiz(quizData), [quizData]);
   const question = quiz?.questions[questionIndex % quiz.questions.length];
@@ -109,17 +114,40 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     }
   };
 
-  if (loading || error || !quiz || !question) {
+  if (loading) {
     return (
       <div className={`quiz-state-screen${isEmbedded ? ' is-embedded' : ''}`}>
-        {loading && <p>Loading your wisdom check...</p>}
-        {error && (
-          <div className="quiz-state-error">
-            <strong>We could not open this concept.</strong>
-            <span>{error}</span>
-          </div>
-        )}
+        <p>Loading your wisdom check...</p>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <QuizStatusView
+        actions={[
+          { label: 'Try Again', onClick: () => setReloadToken((currentToken) => currentToken + 1) },
+          { label: 'Go Back', onClick: handleExit, tone: 'secondary' },
+        ]}
+        isEmbedded={isEmbedded}
+        state={error}
+      />
+    );
+  }
+
+  if (!quiz || !question) {
+    return (
+      <QuizStatusView
+        actions={[
+          { label: 'Reload', onClick: () => window.location.reload() },
+          { label: 'Go Back', onClick: handleExit, tone: 'secondary' },
+        ]}
+        isEmbedded={isEmbedded}
+        state={resolveQuizErrorState({
+          message: 'This concept could not be prepared because its data is incomplete.',
+          statusCode: 500,
+        })}
+      />
     );
   }
 

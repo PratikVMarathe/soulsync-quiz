@@ -1002,6 +1002,69 @@ button {
   font-weight: 500;
 }
 
+.quiz-status-card {
+  align-items: center;
+  background: rgba(255, 251, 246, 0.96);
+  border: 1px solid rgba(39, 88, 66, 0.1);
+  border-radius: 26px;
+  box-shadow: 0 28px 56px rgba(52, 59, 44, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 520px;
+  padding: 28px 24px;
+  text-align: center;
+  width: min(100%, 520px);
+}
+
+.quiz-status-code {
+  color: #2f7654;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.quiz-status-card strong {
+  color: #19342f;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+
+.quiz-status-message {
+  color: #5a6862;
+  line-height: 1.72;
+}
+
+.quiz-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.quiz-status-button {
+  align-items: center;
+  background: #2f7654;
+  border: 1px solid #2f7654;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+}
+
+.quiz-status-button.is-secondary {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(30, 53, 45, 0.14);
+  color: #1e4b38;
+}
+
 @media (max-width: 1320px) {
   .quiz-main {
     padding-left: 45px;
