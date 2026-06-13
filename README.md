@@ -1,16 +1,63 @@
-# React + Vite
+# SoulSync Quiz Remote
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The quiz app is a federated remote consumed by the host.
 
-Currently, two official plugins are available:
+It exposes:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```text
+./QuizWidget -> ./src/App.jsx
+```
 
-## React Compiler
+## Default Port
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+`5001`
 
-## Expanding the ESLint configuration
+## Scripts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+## Environment Variables
+
+```env
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_MEASUREMENT_ID=
+VITE_DEV_PORT=5001
+VITE_PREVIEW_PORT=5001
+```
+
+## Responsibilities
+
+- fetch quiz content from Firestore
+- normalize quiz payloads
+- render quiz intro before starting
+- render responsive quiz attempt UI
+- show friendly fallback states for missing quiz or permission failures
+
+## Development Note
+
+`src/data/previewQuiz.js` exists as local preview/fallback data for UI development and normalization safety. Production quiz content should come from Firestore.
+
+## Important Files
+
+- `src/App.jsx`
+- `src/utils/normalizeQuiz.js`
+- `src/data/previewQuiz.js`
+- `src/data/quizVisuals.js`
+- `vite.config.js`
+
+## Related Docs
+
+- [../README.md](../README.md)
+- [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
+- [../docs/FIREBASE_DATA_MODEL.md](../docs/FIREBASE_DATA_MODEL.md)
+
