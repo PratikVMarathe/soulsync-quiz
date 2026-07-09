@@ -33,7 +33,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
       setError(null);
 
       try {
-        const [{ doc, getDoc }, { auth, db }] = await Promise.all([
+        const [{ collection, getDocs, limit, query, where }, { auth, db }] = await Promise.all([
           import('firebase/firestore'),
           import('./config/firebase'),
         ]);
@@ -43,14 +43,23 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
           throw new Error('Your sign-in session is not available in the quiz app. Please sign in again.');
         }
 
-        const quizSnapshot = await getDoc(doc(db, 'quizzes', quizId));
+        const quizSnapshot = await getDocs(query(
+          collection(db, 'quizzes'),
+          where('slug', '==', quizId),
+          where('status', '==', 'ACTIVE'),
+          limit(1),
+        ));
 
-        if (!quizSnapshot.exists()) {
-          throw new Error('This concept does not exist or was removed.');
+        if (quizSnapshot.empty) {
+          throw new Error('This concept does not exist, is inactive, or was removed.');
         }
 
         if (!ignoreResult) {
-          setQuizData(quizSnapshot.data());
+          const quizDocument = quizSnapshot.docs[0];
+          setQuizData({
+            id: quizDocument.id,
+            ...quizDocument.data(),
+          });
           setHasStarted(false);
           setQuestionIndex(0);
           setSelectedAnswer(null);

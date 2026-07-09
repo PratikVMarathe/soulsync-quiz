@@ -29,6 +29,16 @@ const formatEstimatedTime = (seconds) => {
 const getIntroTitle = (title) => title?.replace(/^concept\s*\d+\s*:\s*/i, '').trim();
 
 const getWisdomCitation = (question) => {
+  const primaryReference = question.references?.[0];
+
+  if (primaryReference?.source) {
+    const chapterVerse = primaryReference.chapter && primaryReference.verse
+      ? ` ${primaryReference.chapter}.${primaryReference.verse}`
+      : '';
+
+    return `${primaryReference.source}${chapterVerse}`;
+  }
+
   const tips = question.tips || '';
   const directCitation = tips.match(/Bhagavad Gita\s*\((\d+\.\d+)\)/i);
   if (directCitation) return `Bhagavad Gita ${directCitation[1]}`;
@@ -54,6 +64,11 @@ const normalizeQuestion = (question = {}) => {
   const options = question.options?.length
     ? question.options.map(normalizeOption)
     : fallbackQuestion.options;
+  const primaryReference = question.references?.[0];
+  const insight = question.explanation
+    || question.tips
+    || primaryReference?.text
+    || fallbackQuestion.insight;
 
   return {
     prompt: question.prompt || question.question || question.text || question.title || fallbackQuestion.prompt,
@@ -62,11 +77,11 @@ const normalizeQuestion = (question = {}) => {
     correctAnswer: Number(
       question.correctAnswer ?? question.correctIndex ?? question.answerIndex ?? 0,
     ),
-    insight: question.insight || question.tips || fallbackQuestion.insight,
+    insight,
     timeRemainingSeconds: parseDurationSeconds(question.time, 30),
     wisdom: {
       ...defaultWisdom,
-      translation: question.tips || defaultWisdom.translation,
+      translation: question.tips || question.explanation || primaryReference?.text || defaultWisdom.translation,
       citation: getWisdomCitation(question),
       ...(question.wisdom || {}),
     },
@@ -90,7 +105,10 @@ export const normalizeQuiz = (quizData) => {
     (duration, question) => duration + question.timeRemainingSeconds,
     0,
   );
-  const estimatedTime = quizData.time || formatEstimatedTime(totalDurationSeconds);
+  const estimatedTime = quizData.timeLimitLabel
+    || quizData.time
+    || (Number(quizData.estimatedTime) ? formatEstimatedTime(Number(quizData.estimatedTime)) : null)
+    || formatEstimatedTime(totalDurationSeconds);
   const adminImageUrl = quizData.imageUrl
     || quizData.heroImage
     || quizData.heroImageUrl
