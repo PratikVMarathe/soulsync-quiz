@@ -71,6 +71,7 @@ const normalizeQuestion = (question = {}) => {
     || fallbackQuestion.insight;
 
   return {
+    id: question.id || question.questionId || question.text || fallbackQuestion.prompt,
     prompt: question.prompt || question.question || question.text || question.title || fallbackQuestion.prompt,
     eyebrow: question.eyebrow || 'Wisdom Check',
     options,
@@ -78,6 +79,7 @@ const normalizeQuestion = (question = {}) => {
       question.correctAnswer ?? question.correctIndex ?? question.answerIndex ?? 0,
     ),
     insight,
+    references: question.references || [],
     timeRemainingSeconds: parseDurationSeconds(question.time, 30),
     wisdom: {
       ...defaultWisdom,
@@ -130,6 +132,8 @@ export const normalizeQuiz = (quizData) => {
   );
 
   return {
+    id: quizData.id || '',
+    slug: quizData.slug || '',
     title: quizData.title || previewQuiz.title,
     introTitle: quizData.introTitle || getIntroTitle(quizData.title) || previewQuiz.introTitle,
     description: quizData.description || previewQuiz.description,

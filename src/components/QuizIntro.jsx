@@ -7,7 +7,13 @@ const introSteps = [
   { label: 'Reflection', icon: 'spark' },
 ];
 
-export default function QuizIntro({ quiz, onExit, onStart, isEmbedded = false }) {
+export default function QuizIntro({
+  quiz,
+  onExit,
+  onStart,
+  starting = false,
+  isEmbedded = false,
+}) {
   return (
     <div className={`quiz-intro-screen${isEmbedded ? ' is-embedded' : ''}`}>
       {!isEmbedded && (
@@ -84,8 +90,8 @@ export default function QuizIntro({ quiz, onExit, onStart, isEmbedded = false })
             </div>
 
             <div className="quiz-intro-start-wrap">
-              <button className="quiz-intro-start" onClick={onStart} type="button">
-                <span>Start Concept</span>
+              <button className="quiz-intro-start" disabled={starting} onClick={onStart} type="button">
+                <span>{starting ? 'Starting...' : 'Start Quiz'}</span>
                 <Icon name="arrow" size={21} />
               </button>
               <Icon className="quiz-intro-spark" name="spark" size={24} />
