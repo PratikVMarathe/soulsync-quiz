@@ -1,14 +1,29 @@
 import Icon from './Icon';
 
-const getOptionClassName = (answerIndex, correctAnswer, selectedAnswer) => {
-  if (selectedAnswer === null) return '';
-  if (answerIndex === correctAnswer) return ' is-correct';
-  if (answerIndex === selectedAnswer) return ' is-incorrect';
-  return '';
+const getOptionClassName = ({ answerIndex, correctAnswer, isSubmitted, selectedAnswer }) => {
+  if (isSubmitted) {
+    if (answerIndex === correctAnswer) return ' is-correct';
+    if (answerIndex === selectedAnswer) return ' is-incorrect';
+    return '';
+  }
+
+  return answerIndex === selectedAnswer ? ' is-selected' : '';
 };
 
-export default function QuestionCard({ question, selectedAnswer, onSelectAnswer, onNext }) {
-  const hasAnswered = selectedAnswer !== null;
+export default function QuestionCard({
+  canGoNext,
+  canGoPrevious,
+  isLastQuestion,
+  isSubmitting = false,
+  isSubmitted = false,
+  onNext,
+  onPrevious,
+  onSelectAnswer,
+  onSubmit,
+  question,
+  selectedAnswer,
+}) {
+  const hasSelectedAnswer = selectedAnswer !== null;
 
   return (
     <article className="quiz-question-card">
@@ -19,16 +34,21 @@ export default function QuestionCard({ question, selectedAnswer, onSelectAnswer,
 
       <h1>{question.prompt}</h1>
       <p className="quiz-question-helper">
-        {hasAnswered ? 'Here is the best answer' : 'Choose the best answer'}
+        {isSubmitted ? 'Here is the best answer' : 'Choose the best answer'}
       </p>
 
       <div className="quiz-options">
         {question.options.map((option, index) => {
-          const optionClassName = getOptionClassName(index, question.correctAnswer, selectedAnswer);
+          const optionClassName = getOptionClassName({
+            answerIndex: index,
+            correctAnswer: question.correctAnswer,
+            isSubmitted,
+            selectedAnswer,
+          });
           return (
             <button
               className={`quiz-option${optionClassName}`}
-              disabled={hasAnswered}
+              disabled={isSubmitted}
               key={option.text}
               onClick={() => onSelectAnswer(index)}
               type="button"
@@ -46,21 +66,44 @@ export default function QuestionCard({ question, selectedAnswer, onSelectAnswer,
         })}
       </div>
 
-      {hasAnswered && (
+      {isSubmitted ? (
         <>
           <div className="quiz-insight">
             <Icon name="spark" size={29} />
             <p><strong>Insight:</strong> {question.insight}</p>
           </div>
-          <div className="quiz-next-wrap">
-            <button className="quiz-next-button" onClick={onNext} type="button">
-              <span>Next Concept</span>
-              <Icon name="arrow" size={22} />
-            </button>
-            <Icon className="quiz-button-spark" name="spark" size={28} />
-          </div>
         </>
-      )}
+      ) : null}
+
+      {!isSubmitted ? (
+        <div className="quiz-runtime-actions">
+          <button
+            className="quiz-secondary-button"
+            disabled={!canGoPrevious}
+            onClick={onPrevious}
+            type="button"
+          >
+            Previous
+          </button>
+
+          {!isLastQuestion ? (
+            <button
+              className="quiz-next-button"
+              disabled={!canGoNext}
+              onClick={onNext}
+              type="button"
+            >
+              <span>{hasSelectedAnswer ? 'Next' : 'Skip'}</span>
+              <Icon name="arrow" size={20} />
+            </button>
+          ) : (
+            <button className="quiz-next-button" disabled={isSubmitting} onClick={onSubmit} type="button">
+              <span>{isSubmitting ? 'Submitting...' : 'Submit Quiz'}</span>
+              <Icon name="arrow" size={20} />
+            </button>
+          )}
+        </div>
+      ) : null}
     </article>
   );
 }
