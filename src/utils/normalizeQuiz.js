@@ -143,6 +143,7 @@ export const normalizeQuiz = (quizData) => {
     visualKey,
     level: quizData.level || 'Beginner',
     totalQuestions: questions.length,
+    allowRetake: quizData.allowRetake ?? true,
     questions,
   };
 };

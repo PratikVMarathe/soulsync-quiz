@@ -107,7 +107,7 @@ export default function QuizResult({
         </div>
 
         <button className="quiz-result-return" onClick={onReturn} type="button">
-          <span>Back to Dashboard</span>
+          <span>Continue Your Journey</span>
           <Icon name="arrow" size={20} />
         </button>
       </section>

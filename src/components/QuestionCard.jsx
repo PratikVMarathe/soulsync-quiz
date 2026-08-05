@@ -14,8 +14,9 @@ export default function QuestionCard({
   canGoNext,
   canGoPrevious,
   isLastQuestion,
-  isSubmitting = false,
   isSubmitted = false,
+  isSubmitting = false,
+  isTimeExpired = false,
   onNext,
   onPrevious,
   onSelectAnswer,
@@ -24,6 +25,7 @@ export default function QuestionCard({
   selectedAnswer,
 }) {
   const hasSelectedAnswer = selectedAnswer !== null;
+  const disableOptions = isSubmitted || isTimeExpired;
 
   return (
     <article className="quiz-question-card">
@@ -34,7 +36,7 @@ export default function QuestionCard({
 
       <h1>{question.prompt}</h1>
       <p className="quiz-question-helper">
-        {isSubmitted ? 'Here is the best answer' : 'Choose the best answer'}
+        {isSubmitted ? 'Here is the best answer' : isTimeExpired ? 'Time has expired for this question' : 'Choose the best answer'}
       </p>
 
       <div className="quiz-options">
@@ -48,7 +50,7 @@ export default function QuestionCard({
           return (
             <button
               className={`quiz-option${optionClassName}`}
-              disabled={isSubmitted}
+              disabled={disableOptions}
               key={option.text}
               onClick={() => onSelectAnswer(index)}
               type="button"
@@ -65,6 +67,21 @@ export default function QuestionCard({
           );
         })}
       </div>
+
+      {!isSubmitted && isTimeExpired ? (
+        <div className="quiz-insight is-result">
+          <Icon name="timer" size={29} />
+          <div>
+            <p><strong>Time Expired:</strong> {selectedAnswer === null ? 'No answer was selected (Marked as Skipped).' : 'Your selected answer is locked.'} Advancing to next screen shortly...</p>
+            {question.insight && (
+              <p style={{ marginTop: '0.5rem' }}><strong>Reflection:</strong> {question.insight}</p>
+            )}
+            {question.wisdom?.translation && (
+              <p style={{ marginTop: '0.5rem' }}><strong>{question.wisdom.citation || 'Gita Wisdom'}:</strong> {question.wisdom.translation}</p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {isSubmitted ? (
         <>
@@ -107,3 +124,4 @@ export default function QuestionCard({
     </article>
   );
 }
+
