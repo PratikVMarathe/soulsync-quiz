@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { previewQuiz } from './data/previewQuiz';
 import { normalizeQuiz } from './utils/normalizeQuiz';
 import AiGuideCard from './components/AiGuideCard';
@@ -11,15 +11,20 @@ import QuizSidebar from './components/QuizSidebar';
 import QuizTopbar from './components/QuizTopbar';
 import TimerCard from './components/TimerCard';
 import { resolveQuizErrorState } from './utils/resolveQuizErrorState';
-import { completeQuizAttempt, createQuizAttempt } from './services/quizAttemptService';
-import { loadActiveQuizBySlug } from './services/quizLoaderService';
+import {
+  completeQuizAttempt,
+  createQuizAttempt,
+  loadActiveQuizAttempt,
+  loadUserQuizAttempts,
+  updateQuizAttemptRuntime,
+} from './services/quizAttemptService';
 import {
   buildAttemptAnswers,
   calculateQuizResult,
   createInitialAnswerState,
-  getElapsedSeconds,
   setAnswerAtIndex,
 } from './utils/quizAttempt';
+import { loadActiveQuizBySlug } from './services/quizLoaderService';
 import './index.css';
 
 export default function App({ user, quizId, onExit, isEmbedded = false }) {
@@ -31,12 +36,15 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   const [startingAttempt, setStartingAttempt] = useState(false);
   const [submittingAttempt, setSubmittingAttempt] = useState(false);
   const [attemptId, setAttemptId] = useState('');
-  const [attemptStartedAtMs, setAttemptStartedAtMs] = useState(0);
-  const [questionStartedAtMs, setQuestionStartedAtMs] = useState(0);
+  const [existingActiveAttempt, setExistingActiveAttempt] = useState(null);
+  const [hasCompletedAttempt, setHasCompletedAttempt] = useState(false);
+  const [totalTimeTaken, setTotalTimeTaken] = useState(0);
   const [answerState, setAnswerState] = useState([]);
   const [result, setResult] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!quizId) return undefined;
@@ -49,9 +57,21 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
 
       try {
         const quizDocument = await loadActiveQuizBySlug(quizId);
+        let activeAttempt = null;
+        let isCompleted = false;
+
+        if (!isPreview && user?.uid) {
+          activeAttempt = await loadActiveQuizAttempt({ quizSlug: quizId, userId: user.uid });
+          if (!activeAttempt) {
+            const userAttempts = await loadUserQuizAttempts(user.uid);
+            isCompleted = (userAttempts[quizId]?.completedAttempts?.length > 0);
+          }
+        }
 
         if (!ignoreResult) {
           setQuizData(quizDocument);
+          setExistingActiveAttempt(activeAttempt);
+          setHasCompletedAttempt(isCompleted);
           setHasStarted(false);
           setQuestionIndex(0);
           setAttemptId('');
@@ -79,27 +99,102 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     return () => {
       ignoreResult = true;
     };
-  }, [quizId, reloadToken]);
+  }, [quizId, reloadToken, user?.uid, isPreview]);
 
   const quiz = useMemo(() => normalizeQuiz(quizData), [quizData]);
   const question = quiz?.questions[questionIndex];
   const selectedAnswer = answerState[questionIndex]?.selectedIndex ?? null;
+  const isTimeExpired = (answerState[questionIndex]?.remainingSeconds <= 0);
 
-  const recordCurrentQuestionTime = useCallback(() => {
-    const elapsedSeconds = getElapsedSeconds(questionStartedAtMs);
+  const performSave = useCallback(async (customAnswers, customIndex, customRemaining, isResumeCall = false) => {
+    if (isPreview || !attemptId || !user?.uid || result || submittingAttempt) return;
 
-    setAnswerState((currentAnswers) => setAnswerAtIndex(currentAnswers, questionIndex, {
-      timeTaken: (currentAnswers[questionIndex]?.timeTaken || 0) + elapsedSeconds,
-    }));
-  }, [questionIndex, questionStartedAtMs]);
+    const answersToSave = customAnswers || answerState;
+    const indexToSave = customIndex !== undefined ? customIndex : questionIndex;
+    const currentAns = answersToSave[indexToSave];
+    const remaining = customRemaining !== undefined ? customRemaining : (currentAns?.remainingSeconds ?? 0);
+
+    try {
+      await updateQuizAttemptRuntime({
+        answers: answersToSave,
+        attemptId,
+        currentQuestionIndex: indexToSave,
+        isResume: isResumeCall,
+        remainingSeconds: remaining,
+        totalTimeTaken,
+        userId: user.uid,
+      });
+    } catch (err) {
+      console.error('Failed to auto-save runtime:', err);
+    }
+  }, [answerState, attemptId, isPreview, questionIndex, result, submittingAttempt, totalTimeTaken, user]);
+
+  useEffect(() => {
+    if (!hasStarted || result || submittingAttempt || isPreview || !attemptId) return undefined;
+    const intervalId = setInterval(() => {
+      performSave();
+    }, 15000);
+    return () => clearInterval(intervalId);
+  }, [attemptId, hasStarted, isPreview, performSave, result, submittingAttempt]);
+
+  useEffect(() => {
+    if (!hasStarted || result || submittingAttempt) return undefined;
+
+    const handleVisibility = () => {
+      const isHidden = document.visibilityState === 'hidden' || document.hidden;
+      setIsPaused(isHidden);
+      if (isHidden) performSave();
+    };
+    const handleUnload = () => performSave();
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handleUnload);
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handleUnload);
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [hasStarted, performSave, result, submittingAttempt]);
+
+  useEffect(() => {
+    if (!hasStarted || result || submittingAttempt || isPaused || !quiz) return undefined;
+
+    const intervalId = setInterval(() => {
+      setAnswerState((currentAnswers) => {
+        const currentAns = currentAnswers[questionIndex];
+        if (!currentAns || currentAns.remainingSeconds <= 0) return currentAnswers;
+
+        return setAnswerAtIndex(currentAnswers, questionIndex, {
+          remainingSeconds: Math.max(0, currentAns.remainingSeconds - 1),
+          timeTaken: (currentAns.timeTaken || 0) + 1,
+        });
+      });
+      setTotalTimeTaken((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [hasStarted, isPaused, questionIndex, quiz, result, submittingAttempt]);
 
   const handleSelectAnswer = useCallback((answerIndex) => {
-    if (result) return;
+    if (result || submittingAttempt || isTimeExpired) return;
 
-    setAnswerState((currentAnswers) => setAnswerAtIndex(currentAnswers, questionIndex, {
-      selectedIndex: answerIndex,
-    }));
-  }, [questionIndex, result]);
+    setAnswerState((currentAnswers) => {
+      const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
+        answeredAt: Date.now(),
+        selectedIndex: answerIndex,
+        visited: true,
+      });
+
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        performSave(updated, questionIndex);
+      }, 1500);
+
+      return updated;
+    });
+  }, [isTimeExpired, performSave, questionIndex, result, submittingAttempt]);
 
   useEffect(() => {
     if (!hasStarted || result || !question) return undefined;
@@ -122,16 +217,52 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     setError(null);
 
     try {
-      const nextAttemptId = isPreview ? '' : await createQuizAttempt({ quiz, user });
-      const now = Date.now();
+      if (existingActiveAttempt) {
+        const restoredIndex = existingActiveAttempt.runtime?.currentQuestionIndex ?? existingActiveAttempt.currentQuestionIndex ?? 0;
+        const restoredAnswers = existingActiveAttempt.answers?.length
+          ? existingActiveAttempt.answers
+          : createInitialAnswerState(quiz.questions);
 
-      setAttemptId(nextAttemptId);
-      setAttemptStartedAtMs(now);
-      setQuestionStartedAtMs(now);
-      setAnswerState(createInitialAnswerState(quiz.totalQuestions));
-      setQuestionIndex(0);
-      setResult(null);
-      setHasStarted(true);
+        const normalizedAnswers = quiz.questions.map((q, idx) => {
+          const saved = restoredAnswers[idx] || {};
+          return {
+            answeredAt: saved.answeredAt ?? null,
+            questionId: q.id || `q${idx + 1}`,
+            remainingSeconds: Number.isInteger(saved.remainingSeconds) ? saved.remainingSeconds : Number(q.timeRemainingSeconds ?? 30),
+            selectedIndex: Number.isInteger(saved.selectedIndex) ? saved.selectedIndex : null,
+            timeTaken: Number(saved.timeTaken) || 0,
+            visited: Boolean(saved.visited || idx === restoredIndex),
+          };
+        });
+
+        setAttemptId(existingActiveAttempt.id);
+        setAnswerState(normalizedAnswers);
+        setQuestionIndex(restoredIndex);
+        setTotalTimeTaken(existingActiveAttempt.totalTimeTaken || 0);
+        setHasStarted(true);
+
+        if (!isPreview && user?.uid) {
+          updateQuizAttemptRuntime({
+            answers: normalizedAnswers,
+            attemptId: existingActiveAttempt.id,
+            currentQuestionIndex: restoredIndex,
+            isResume: true,
+            remainingSeconds: normalizedAnswers[restoredIndex]?.remainingSeconds ?? 30,
+            totalTimeTaken: existingActiveAttempt.totalTimeTaken || 0,
+            userId: user.uid,
+          }).catch((e) => console.error('Error recording resume event:', e));
+        }
+      } else {
+        const initialAnswers = createInitialAnswerState(quiz.questions);
+        const nextAttemptId = isPreview ? '' : await createQuizAttempt({ quiz, user });
+
+        setAttemptId(nextAttemptId);
+        setAnswerState(initialAnswers);
+        setQuestionIndex(0);
+        setTotalTimeTaken(0);
+        setResult(null);
+        setHasStarted(true);
+      }
     } catch (startError) {
       console.error('Failed to start quiz attempt:', startError);
       setError(resolveQuizErrorState(startError, startError.code === 'permission-denied'
@@ -141,7 +272,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
             title: 'Attempt Access Restricted',
           }
         : {
-            message: 'We could not start this quiz attempt right now. Please try again.',
+            message: startError.message || 'We could not start this quiz attempt right now. Please try again.',
             title: 'Could Not Start Quiz',
           }));
     } finally {
@@ -149,33 +280,45 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (questionIndex <= 0) return;
-    recordCurrentQuestionTime();
-    setQuestionStartedAtMs(Date.now());
-    setQuestionIndex((currentIndex) => currentIndex - 1);
-  };
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-  const handleNext = () => {
+    const prevIndex = questionIndex - 1;
+    setAnswerState((current) => {
+      const updated = setAnswerAtIndex(current, prevIndex, { visited: true });
+      performSave(updated, prevIndex);
+      return updated;
+    });
+    setQuestionIndex(prevIndex);
+  }, [performSave, questionIndex]);
+
+  const handleNext = useCallback(() => {
     if (!quiz || questionIndex >= quiz.totalQuestions - 1) return;
-    recordCurrentQuestionTime();
-    setQuestionStartedAtMs(Date.now());
-    setQuestionIndex((currentIndex) => currentIndex + 1);
-  };
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-  const handleSubmit = async () => {
+    const nextIndex = questionIndex + 1;
+    setAnswerState((current) => {
+      const updated = setAnswerAtIndex(current, nextIndex, { visited: true });
+      performSave(updated, nextIndex);
+      return updated;
+    });
+    setQuestionIndex(nextIndex);
+  }, [performSave, questionIndex, quiz]);
+
+  const handleSubmit = useCallback(async () => {
     if (!quiz || submittingAttempt) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    const currentElapsedSeconds = getElapsedSeconds(questionStartedAtMs);
     const attemptAnswers = buildAttemptAnswers({
       answers: answerState,
-      currentElapsedSeconds,
+      currentElapsedSeconds: 0,
       currentQuestionIndex: questionIndex,
       questions: quiz.questions,
     });
     const nextResult = calculateQuizResult({
       attemptAnswers,
-      totalTimeTaken: getElapsedSeconds(attemptStartedAtMs),
+      totalTimeTaken,
     });
 
     setSubmittingAttempt(true);
@@ -186,16 +329,22 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
         await completeQuizAttempt({
           attemptId,
           currentQuestionIndex: questionIndex,
+          quizSlug: quiz.slug,
           result: nextResult,
           user,
         });
       }
 
       setAnswerState(attemptAnswers.map((answer) => ({
+        answeredAt: answer.answeredAt,
+        remainingSeconds: answer.remainingSeconds,
         selectedIndex: answer.selectedIndex,
         timeTaken: answer.timeTaken,
+        visited: true,
       })));
       setResult(nextResult);
+      setExistingActiveAttempt(null);
+      setHasCompletedAttempt(true);
     } catch (submitError) {
       console.error('Failed to submit quiz attempt:', submitError);
       setError(resolveQuizErrorState(submitError, submitError.code === 'permission-denied'
@@ -211,9 +360,28 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     } finally {
       setSubmittingAttempt(false);
     }
-  };
+  }, [answerState, attemptId, isPreview, questionIndex, quiz, submittingAttempt, totalTimeTaken, user]);
+
+  useEffect(() => {
+    if (!hasStarted || result || submittingAttempt || !isTimeExpired) return undefined;
+
+    performSave();
+
+    const timerId = setTimeout(() => {
+      if (questionIndex < (quiz?.totalQuestions || 1) - 1) {
+        handleNext();
+      } else {
+        handleSubmit();
+      }
+    }, 3000);
+
+    return () => clearTimeout(timerId);
+  }, [handleNext, handleSubmit, hasStarted, isTimeExpired, performSave, questionIndex, quiz?.totalQuestions, result, submittingAttempt]);
 
   const handleExit = () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    performSave();
+
     if (onExit) {
       onExit();
       return;
@@ -264,9 +432,10 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   if (!hasStarted) {
     return (
       <QuizIntro
+        activeAttempt={existingActiveAttempt}
+        hasCompleted={hasCompletedAttempt}
         isEmbedded={isEmbedded}
         quiz={quiz}
-        user={user}
         onExit={handleExit}
         onStart={handleStartQuiz}
         starting={startingAttempt}
@@ -302,6 +471,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
               canGoPrevious={questionIndex > 0}
               isLastQuestion={questionIndex === quiz.totalQuestions - 1}
               isSubmitting={submittingAttempt}
+              isTimeExpired={isTimeExpired}
               question={question}
               selectedAnswer={selectedAnswer}
               onPrevious={handlePrevious}
@@ -314,11 +484,8 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
             ) : null}
           </div>
 
-          <aside className="quiz-support-column" aria-label="Quiz support">
-            <TimerCard
-              initialSeconds={question.timeRemainingSeconds}
-              key={questionIndex}
-            />
+          <aside aria-label="Quiz support" className="quiz-support-column">
+            <TimerCard seconds={answerState[questionIndex]?.remainingSeconds ?? 0} />
             <AiGuideCard />
           </aside>
         </section>
@@ -326,3 +493,4 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     </div>
   );
 }
+

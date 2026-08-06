@@ -8,22 +8,36 @@ const introSteps = [
 ];
 
 export default function QuizIntro({
-  quiz,
+  activeAttempt = null,
+  hasCompleted = false,
+  isEmbedded = false,
   onExit,
   onStart,
+  quiz,
   starting = false,
-  isEmbedded = false,
 }) {
+  const isRetakeDisabled = !activeAttempt && hasCompleted && quiz.allowRetake === false;
+  const isResume = Boolean(activeAttempt);
+
+  let buttonLabel = starting ? 'Starting...' : 'Start Quiz';
+  if (isResume) {
+    buttonLabel = starting ? 'Resuming...' : 'Resume Quiz';
+  } else if (isRetakeDisabled) {
+    buttonLabel = 'Completed';
+  }
+
+  const restoredQuestionNumber = (activeAttempt?.runtime?.currentQuestionIndex ?? activeAttempt?.currentQuestionIndex ?? 0) + 1;
+
   return (
     <div className={`quiz-intro-screen${isEmbedded ? ' is-embedded' : ''}`}>
       {!isEmbedded && (
         <header className="quiz-intro-header">
-          <a className="quiz-brand" href="/" aria-label="SoulSync home">
+          <a aria-label="SoulSync home" className="quiz-brand" href="/">
             <Icon name="lotus" size={36} />
             <span>SoulSync</span>
           </a>
 
-          <div className="quiz-intro-steps" aria-label="Quiz progress">
+          <div aria-label="Quiz progress" className="quiz-intro-steps">
             {introSteps.map((step, index) => (
               <div className={`quiz-intro-step${step.isActive ? ' is-active' : ''}`} key={step.label}>
                 <span><Icon name={step.icon} size={14} /></span>
@@ -86,13 +100,26 @@ export default function QuizIntro({
 
             <div className="quiz-intro-note">
               <Icon name="bulb" size={25} />
-              <p>Take a deep breath. This short quiz will help you reflect and grow.</p>
+              <p>
+                {isResume ? (
+                  `You have an active quiz attempt saved. Resume directly from Question ${restoredQuestionNumber}.`
+                ) : isRetakeDisabled ? (
+                  'You have already completed this quiz. Retakes are currently disabled for this concept.'
+                ) : (
+                  'Take a deep breath. This short quiz will help you reflect and grow.'
+                )}
+              </p>
             </div>
 
             <div className="quiz-intro-start-wrap">
-              <button className="quiz-intro-start" disabled={starting} onClick={onStart} type="button">
-                <span>{starting ? 'Starting...' : 'Start Quiz'}</span>
-                <Icon name="arrow" size={21} />
+              <button
+                className="quiz-intro-start"
+                disabled={starting || isRetakeDisabled}
+                onClick={onStart}
+                type="button"
+              >
+                <span>{buttonLabel}</span>
+                <Icon name={isRetakeDisabled ? 'check' : 'arrow'} size={21} />
               </button>
               <Icon className="quiz-intro-spark" name="spark" size={24} />
             </div>
@@ -102,3 +129,4 @@ export default function QuizIntro({
     </div>
   );
 }
+

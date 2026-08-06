@@ -4,11 +4,21 @@ export const ATTEMPT_STATUSES = {
   IN_PROGRESS: 'IN_PROGRESS',
 };
 
-export function createInitialAnswerState(totalQuestions) {
-  return Array.from({ length: totalQuestions }, () => ({
-    selectedIndex: null,
-    timeTaken: 0,
-  }));
+export function createInitialAnswerState(questionsOrCount) {
+  const isArray = Array.isArray(questionsOrCount);
+  const totalQuestions = isArray ? questionsOrCount.length : Number(questionsOrCount) || 0;
+
+  return Array.from({ length: totalQuestions }, (_, index) => {
+    const question = isArray ? questionsOrCount[index] : null;
+    return {
+      answeredAt: null,
+      questionId: question?.id || `q${index + 1}`,
+      remainingSeconds: Number(question?.timeRemainingSeconds ?? 30),
+      selectedIndex: null,
+      timeTaken: 0,
+      visited: index === 0,
+    };
+  });
 }
 
 export function getElapsedSeconds(startedAtMs) {
@@ -31,16 +41,59 @@ export function buildAttemptAnswers({ answers, currentElapsedSeconds = 0, curren
     const isCurrentQuestion = index === currentQuestionIndex;
     const baseTimeTaken = Number(answer.timeTaken) || 0;
     const timeTaken = baseTimeTaken + (isCurrentQuestion ? currentElapsedSeconds : 0);
+    const defaultRemaining = Number(question.timeRemainingSeconds ?? 30);
+    const remainingSeconds = Number.isInteger(answer.remainingSeconds) ? answer.remainingSeconds : Math.max(0, defaultRemaining - timeTaken);
 
     return {
+      answeredAt: answer.answeredAt ?? null,
       correctIndex: question.correctAnswer,
       isCorrect: selectedIndex !== null && selectedIndex === question.correctAnswer,
       questionId: question.id || `q${index + 1}`,
+      remainingSeconds,
       selectedIndex,
       timeTaken,
+      visited: Boolean(answer.visited || isCurrentQuestion || index === 0),
     };
   });
 }
+
+export function formatAnswersForFirestore(answers = []) {
+  return answers.map((answer, index) => ({
+    answeredAt: answer.answeredAt ?? null,
+    questionId: answer.questionId || `q${index + 1}`,
+    remainingSeconds: Number(answer.remainingSeconds ?? 0),
+    selectedIndex: Number.isInteger(answer.selectedIndex) ? answer.selectedIndex : null,
+    timeTaken: Number(answer.timeTaken) || 0,
+    visited: Boolean(answer.visited ?? false),
+  }));
+}
+
+export function getDeviceMetadata() {
+  const width = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  let viewport = 'DESKTOP';
+  if (width <= 768) {
+    viewport = 'MOBILE';
+  } else if (width <= 1024) {
+    viewport = 'TABLET';
+  }
+
+  let browser = 'Unknown';
+  if (typeof navigator !== 'undefined' && navigator.userAgent) {
+    const ua = navigator.userAgent;
+    if (ua.includes('Edg/')) browser = 'Edge';
+    else if (ua.includes('Chrome/') && !ua.includes('Edg/')) browser = 'Chrome';
+    else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari';
+    else if (ua.includes('Firefox/')) browser = 'Firefox';
+    else browser = 'Other';
+  }
+
+  return {
+    browser,
+    platform: 'WEB',
+    viewport,
+  };
+}
+
 
 export function calculateQuizResult({ attemptAnswers, totalTimeTaken }) {
   const totalQuestions = attemptAnswers.length;
