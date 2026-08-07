@@ -7,6 +7,7 @@ import QuizResult from './components/QuizResult';
 import QuizStatusView from './components/QuizStatusView';
 import QuestionCard from './components/QuestionCard';
 import QuizIntro from './components/QuizIntro';
+import QuizHistory from './components/QuizHistory';
 import QuizSidebar from './components/QuizSidebar';
 import QuizTopbar from './components/QuizTopbar';
 import TimerCard from './components/TimerCard';
@@ -44,6 +45,11 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialViewMode = searchParams.get('view') || 'quiz';
+  const [viewMode, setViewMode] = useState(initialViewMode);
+  
   const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -392,6 +398,14 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     }
   };
 
+  const handleShowQuiz = () => {
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+    }
+
+    setViewMode('quiz');
+  };
+
   if (loading) {
     return (
       <div className={`quiz-state-screen${isEmbedded ? ' is-embedded' : ''}`}>
@@ -426,6 +440,22 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
           statusCode: 500,
         })}
       />
+    );
+  }
+
+  if (viewMode === 'history') {
+    return (
+      <div className={`quiz-app${isEmbedded ? ' is-embedded' : ''}`}>
+        {!isEmbedded && <QuizTopbar user={user} onExit={handleExit} />}
+        {!isEmbedded && <QuizSidebar />}
+        <QuizHistory 
+          onExit={handleExit}
+          onGoToQuiz={handleShowQuiz}
+          onRetake={handleShowQuiz}
+          quiz={quiz} 
+          user={user} 
+        />
+      </div>
     );
   }
 
@@ -493,4 +523,3 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     </div>
   );
 }
-

@@ -29,7 +29,7 @@ const formatEstimatedTime = (seconds) => {
 const getIntroTitle = (title) => title?.replace(/^concept\s*\d+\s*:\s*/i, '').trim();
 
 const getWisdomCitation = (question) => {
-  const primaryReference = question.references?.[0];
+  const primaryReference = getQuestionReferences(question)[0];
 
   if (primaryReference?.source) {
     const chapterVerse = primaryReference.chapter && primaryReference.verse
@@ -60,18 +60,25 @@ const normalizeOption = (option, index) => {
   };
 };
 
+const getQuestionReferences = (question = {}) => {
+  const references = question.references ?? question.reference ?? [];
+  if (Array.isArray(references)) return references.filter(Boolean);
+  return references ? [references] : [];
+};
+
 const normalizeQuestion = (question = {}) => {
   const options = question.options?.length
     ? question.options.map(normalizeOption)
     : fallbackQuestion.options;
-  const primaryReference = question.references?.[0];
+  const references = getQuestionReferences(question);
+  const primaryReference = references[0];
   const insight = question.explanation
     || question.tips
     || primaryReference?.text
     || fallbackQuestion.insight;
 
   return {
-    id: question.id || question.questionId || question.text || fallbackQuestion.prompt,
+    id: question.id || question.questionId || question.text || question.prompt || question.title || fallbackQuestion.prompt,
     prompt: question.prompt || question.question || question.text || question.title || fallbackQuestion.prompt,
     eyebrow: question.eyebrow || 'Wisdom Check',
     options,
@@ -79,7 +86,7 @@ const normalizeQuestion = (question = {}) => {
       question.correctAnswer ?? question.correctIndex ?? question.answerIndex ?? 0,
     ),
     insight,
-    references: question.references || [],
+    references,
     timeRemainingSeconds: parseDurationSeconds(question.time, 30),
     wisdom: {
       ...defaultWisdom,
