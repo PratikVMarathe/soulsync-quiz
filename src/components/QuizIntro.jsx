@@ -111,7 +111,16 @@ export default function QuizIntro({
               </p>
             </div>
 
-            <div className="quiz-intro-start-wrap">
+            <div className="quiz-intro-start-wrap" style={{ display: 'flex', gap: '16px' }}>
+              <button
+                className="quiz-secondary-button"
+                onClick={onExit}
+                type="button"
+                style={{ padding: '0 24px' }}
+              >
+                <Icon name="arrowLeft" size={21} />
+                <span>Back</span>
+              </button>
               <button
                 className="quiz-intro-start"
                 disabled={starting || isRetakeDisabled}

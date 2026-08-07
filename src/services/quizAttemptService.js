@@ -62,6 +62,27 @@ export async function loadActiveQuizAttempt({ quizSlug, userId }) {
   return activeDocs[0];
 }
 
+export async function loadUserAttemptsForQuiz({ userId, quizSlug }) {
+  if (!userId || !quizSlug) return [];
+
+  const q = query(
+    getAttemptCollectionReference(userId),
+    where('quizSlug', '==', quizSlug)
+  );
+
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return [];
+
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+  })).sort((a, b) => {
+    const aTime = a.startedAt?.toMillis ? a.startedAt.toMillis() : 0;
+    const bTime = b.startedAt?.toMillis ? b.startedAt.toMillis() : 0;
+    return bTime - aTime;
+  });
+}
+
 export async function loadUserQuizAttempts(userId) {
   if (!userId) return {};
 
