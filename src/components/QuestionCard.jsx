@@ -73,9 +73,9 @@ export default function QuestionCard({
           <Icon name="timer" size={29} />
           <div>
             <p><strong>Time Expired:</strong> {selectedAnswer === null ? 'No answer was selected (Marked as Skipped).' : 'Your selected answer is locked.'} Advancing to next screen shortly...</p>
-            {question.insight && (
+            {/* {question.insight && (
               <p style={{ marginTop: '0.5rem' }}><strong>Reflection:</strong> {question.insight}</p>
-            )}
+            )} */}
             {question.wisdom?.translation && (
               <p style={{ marginTop: '0.5rem' }}><strong>{question.wisdom.citation || 'Gita Wisdom'}:</strong> {question.wisdom.translation}</p>
             )}
