@@ -23,11 +23,6 @@ export default function QuizSidebar() {
           </a>
         ))}
       </nav>
-
-      <div className="quiz-streak-card">
-        <strong><Icon name="fire" size={24} /> 7</strong>
-        <span>Day Streak</span>
-      </div>
     </aside>
   );
 }

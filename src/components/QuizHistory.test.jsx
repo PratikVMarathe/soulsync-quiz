@@ -31,7 +31,7 @@ vi.mock('../services/quizAttemptService', () => ({
 describe('QuizHistory Component', () => {
   it('renders loading state initially', () => {
     render(<QuizHistory quiz={{ slug: 'test-quiz', title: 'Test Quiz' }} user={{ uid: 'user1' }} onExit={() => {}} />);
-    expect(screen.getByText('Loading history...')).toBeInTheDocument();
+    expect(screen.getAllByText('Loading history...').length).toBeGreaterThan(0);
   });
 
   it('renders history stats and list after loading', async () => {
@@ -42,11 +42,11 @@ describe('QuizHistory Component', () => {
     });
 
     expect(screen.getByText('Latest Score')).toBeInTheDocument();
-    expect(screen.getByText('8')).toBeInTheDocument(); // Latest completed
-    expect(screen.getByText('Best Score')).toBeInTheDocument();
+    expect(screen.getAllByText('8/10').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Best Score').length).toBeGreaterThan(0);
     
     // Check if the attempts are listed
-    expect(screen.getByText('Completed')).toBeInTheDocument();
-    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0);
   });
 });

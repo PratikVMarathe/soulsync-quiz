@@ -25,7 +25,7 @@ export default function QuizResult({
             Result
           </span>
           <h1>{quiz.introTitle}</h1>
-          <p>Your reflection is complete. Review the answers, tips, and references below.</p>
+          <p>Your Quiz is complete. Review the answers, and references below.</p>
         </div>
 
         <div className="quiz-result-score-grid">
@@ -78,12 +78,12 @@ export default function QuizResult({
                 <p><strong>Your answer:</strong> {selectedOption}</p>
                 <p><strong>Correct answer:</strong> {correctOption}</p>
 
-                {question.insight ? (
+                {/* {question.insight ? (
                   <div className="quiz-insight is-result">
                     <Icon name="spark" size={24} />
                     <p><strong>Tip:</strong> {question.insight}</p>
                   </div>
-                ) : null}
+                ) : null} */}
 
                 {question.references?.length ? (
                   <div className="quiz-reference-list">

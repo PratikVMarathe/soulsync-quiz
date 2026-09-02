@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { formatAttemptDuration } from '../utils/quizAttempt';
 import {
   buildAttemptQuestionReview,
@@ -32,11 +32,16 @@ function QuestionStatus({ item }) {
 function ReferenceCard({ reference }) {
   if (!reference) return null;
 
+  const [isExpanded, setIsExpanded] = useState(false);
   const chapterVerse = [
     reference.source,
     reference.chapter ? `Chapter ${reference.chapter}` : '',
     reference.verse ? `Verse ${reference.verse}` : '',
   ].filter(Boolean).join('  -  ');
+
+  const rawText = String(reference.text ?? '').trim();
+  const shouldTruncate = rawText.length > 100;
+  const visibleText = shouldTruncate && !isExpanded ? `${rawText.slice(0, 100).trimEnd()}...` : rawText;
 
   return (
     <div className="quiz-attempt-reference-card">
@@ -45,8 +50,16 @@ function ReferenceCard({ reference }) {
         Reference
       </span>
       {chapterVerse ? <strong>{chapterVerse}</strong> : null}
-      {reference.text ? <p>{reference.text}</p> : null}
-      <button className="quiz-attempt-view-verse" type="button">View Verse</button>
+      {rawText ? (
+        <p>
+          {visibleText}
+          {shouldTruncate ? (
+            <button className="quiz-attempt-view-verse" onClick={() => setIsExpanded((value) => !value)} type="button">
+              {isExpanded ? 'Hide Verse' : 'View Verse'}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }

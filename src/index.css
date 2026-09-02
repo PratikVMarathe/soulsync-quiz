@@ -1480,10 +1480,6 @@ button {
     padding: 16px 14px 84px;
   }
 
-  .quiz-primary-column {
-    padding-top: 0;
-  }
-
   .quiz-progress-header {
     flex-wrap: wrap;
     font-size: 12px;
@@ -2153,7 +2149,8 @@ button {
 }
 
 .quiz-history-go-button {
-  background: radial-gradient(circle at top right, rgba(236, 246, 230, 10.72), transparent 100%), rgba(255, 255, 255, 0.74);;
+  background: radial-gradient(circle at top right, rgba(236, 246, 230, 10.72), transparent 100%), rgba(255, 255, 255, 0.74);
+  ;
   border: 1px solid #b8c7bd;
   border-radius: 18px;
   color: #173934;
@@ -2701,6 +2698,24 @@ button {
   font-size: 13px;
   line-height: 1.5;
   margin: 8px 0 0;
+}
+
+.quiz-attempt-view-verse {
+  background: transparent;
+  border: 0;
+  color: #1f5d48;
+  cursor: pointer;
+  display: inline-block;
+  font: inherit;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.quiz-attempt-view-verse:hover {
+  color: #163d31;
 }
 
 .quiz-attempt-footer-actions {
