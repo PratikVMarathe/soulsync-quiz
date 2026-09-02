@@ -5,14 +5,20 @@ export default function WisdomPanel({ question }) {
 
   return (
     <section className="quiz-wisdom-panel">
-      <div className="quiz-panel-heading">
-        <Icon name="book" size={21} />
-        <h2>{wisdom.title}</h2>
-      </div>
+      {(wisdom?.title || wisdom?.verse || wisdom?.translation || wisdom?.citation) ? (
+        <>
+          {wisdom.title ? (
+            <div className="quiz-panel-heading">
+              <Icon name="book" size={21} />
+              <h2>{wisdom.title}</h2>
+            </div>
+          ) : null}
 
-      {wisdom.verse && <p className="quiz-verse">{wisdom.verse}</p>}
-      <p className="quiz-translation">{wisdom.translation}</p>
-      <p className="quiz-citation">&mdash; {wisdom.citation}</p>
+          {wisdom.verse ? <p className="quiz-verse">{wisdom.verse}</p> : null}
+          {wisdom.translation ? <p className="quiz-translation">{wisdom.translation}</p> : null}
+          {wisdom.citation ? <p className="quiz-citation">&mdash; {wisdom.citation}</p> : null}
+        </>
+      ) : null}
 
       <div className="quiz-community">
         <div className="quiz-panel-heading">
