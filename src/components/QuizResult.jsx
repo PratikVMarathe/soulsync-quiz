@@ -2,13 +2,20 @@ import Icon from './Icon';
 import { formatAttemptDuration } from '../utils/quizAttempt';
 
 function formatReference(reference) {
-  if (!reference?.source) return '';
+  if (!reference) return '';
 
-  const location = reference.chapter && reference.verse
-    ? ` ${reference.chapter}.${reference.verse}`
-    : '';
+  const source = reference.source || reference.referenceSource || '';
+  const chapter = reference.chapter ?? reference.referenceChapter ?? '';
+  const verse = reference.verse ?? reference.referenceVerse ?? '';
+  const location = chapter && verse
+    ? ` ${chapter}.${verse}`
+    : chapter
+      ? ` Chapter ${chapter}`
+      : verse
+        ? ` Verse ${verse}`
+        : '';
 
-  return `${reference.source}${location}`;
+  return `${source}${location}`.trim();
 }
 
 export default function QuizResult({
@@ -65,6 +72,15 @@ export default function QuizResult({
               : question.options[answer.selectedIndex]?.text || 'Unknown answer';
             const correctOption = question.options[question.correctAnswer]?.text || 'Not set';
 
+            const validReferences = (question.references || [])
+              .map((reference) => {
+                const refStr = formatReference(reference);
+                const textStr = reference?.text || reference?.referenceText || '';
+                if (refStr && textStr) return `${refStr}: ${textStr}`;
+                return refStr || textStr || '';
+              })
+              .filter(Boolean);
+
             return (
               <article className="quiz-review-item" key={question.id || question.prompt}>
                 <div className="quiz-review-heading">
@@ -78,20 +94,12 @@ export default function QuizResult({
                 <p><strong>Your answer:</strong> {selectedOption}</p>
                 <p><strong>Correct answer:</strong> {correctOption}</p>
 
-                {/* {question.insight ? (
-                  <div className="quiz-insight is-result">
-                    <Icon name="spark" size={24} />
-                    <p><strong>Tip:</strong> {question.insight}</p>
-                  </div>
-                ) : null} */}
-
-                {question.references?.length ? (
+                {validReferences.length > 0 ? (
                   <div className="quiz-reference-list">
                     <strong>References</strong>
-                    {question.references.map((reference, referenceIndex) => (
+                    {validReferences.map((refText, referenceIndex) => (
                       <p key={`${question.id}-reference-${referenceIndex}`}>
-                        {formatReference(reference)}
-                        {reference.text ? `: ${reference.text}` : ''}
+                        {refText}
                       </p>
                     ))}
                   </div>

@@ -98,4 +98,29 @@ describe('normalizeQuiz', () => {
     expect(result.questions.length).toBe(1); // falls back to previewQuiz fallbackQuestion
     expect(result.totalQuestions).toBe(1);
   });
+
+  it('does not produce references or citation if question has no reference fields', () => {
+    const rawQuiz = {
+      questions: [
+        {
+          id: 'q-no-ref',
+          prompt: 'General Knowledge Question',
+          options: ['A', 'B', 'C', 'D'],
+          references: [],
+        },
+        {
+          id: 'q-empty-ref',
+          prompt: 'Another Question',
+          options: ['A', 'B', 'C', 'D'],
+          references: [{ source: '', chapter: '', verse: '', text: '' }],
+        },
+      ],
+    };
+
+    const result = normalizeQuiz(rawQuiz);
+    expect(result.questions[0].references).toEqual([]);
+    expect(result.questions[0].wisdom.citation).toBe('');
+    expect(result.questions[1].references).toEqual([]);
+    expect(result.questions[1].wisdom.citation).toBe('');
+  });
 });

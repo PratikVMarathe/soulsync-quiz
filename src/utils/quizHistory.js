@@ -111,8 +111,40 @@ export function buildHistorySummary(attempts = [], quiz = {}) {
 
 export function getQuestionReferences(question = {}) {
   const references = question.references ?? question.reference ?? [];
-  if (Array.isArray(references)) return references.filter(Boolean);
-  return references ? [references] : [];
+  const rawList = Array.isArray(references) ? references.filter(Boolean) : references ? [references] : [];
+
+  return rawList
+    .map((ref) => {
+      if (typeof ref === 'string') {
+        const trimmed = ref.trim();
+        return trimmed ? { chapter: null, source: trimmed, text: '', verse: null } : null;
+      }
+      const source = String(ref.source || ref.referenceSource || '').trim();
+      const chapter = ref.chapter !== undefined && ref.chapter !== null && ref.chapter !== ''
+        ? Number(ref.chapter)
+        : ref.referenceChapter !== undefined && ref.referenceChapter !== null && ref.referenceChapter !== ''
+          ? Number(ref.referenceChapter)
+          : null;
+      const verse = ref.verse !== undefined && ref.verse !== null && ref.verse !== ''
+        ? Number(ref.verse)
+        : ref.referenceVerse !== undefined && ref.referenceVerse !== null && ref.referenceVerse !== ''
+          ? Number(ref.referenceVerse)
+          : null;
+      const text = String(ref.text || ref.referenceText || '').trim();
+
+      const validChapter = Number.isFinite(chapter) && chapter > 0 ? chapter : null;
+      const validVerse = Number.isFinite(verse) && verse > 0 ? verse : null;
+
+      if (!source && !validChapter && !validVerse && !text) return null;
+
+      return {
+        chapter: validChapter,
+        source,
+        text,
+        verse: validVerse,
+      };
+    })
+    .filter(Boolean);
 }
 
 function getOptionText(option) {
@@ -122,7 +154,6 @@ function getOptionText(option) {
 
 export function buildAttemptQuestionReview({ attempt, quiz }) {
   const questions = quiz?.questions || [];
-  console.log("Questions", questions);
 
   return questions.map((question, index) => {
     const answers = attempt?.answers || [];
@@ -135,15 +166,7 @@ export function buildAttemptQuestionReview({ attempt, quiz }) {
     const isCorrect = !isSkipped && selectedIndex === correctIndex;
     const isWrong = !isSkipped && !isCorrect;
     const references = getQuestionReferences(question);
-    // console.log("Questions", questions);
-    // console.log("Answer", answer);
-    console.log("Correct Index", correctIndex);
-    console.log("Selected Index", selectedIndex);
-    console.log("Is Skipped", isSkipped);
-    console.log("Is Correct", isCorrect);
-    console.log("Is Wrong", isWrong);
-    console.log("References", references);
-    console.log("selectedAnswer", isSkipped ? 'Skipped' : getOptionText(question.options?.[selectedIndex]) || '-');
+
     return {
       correctAnswer: getOptionText(question.options?.[correctIndex]) || '-',
       isCorrect,

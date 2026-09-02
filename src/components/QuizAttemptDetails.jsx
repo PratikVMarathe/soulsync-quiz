@@ -33,13 +33,19 @@ function ReferenceCard({ reference }) {
   if (!reference) return null;
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const source = reference.source || reference.referenceSource || '';
+  const chapter = reference.chapter ?? reference.referenceChapter ?? '';
+  const verse = reference.verse ?? reference.referenceVerse ?? '';
   const chapterVerse = [
-    reference.source,
-    reference.chapter ? `Chapter ${reference.chapter}` : '',
-    reference.verse ? `Verse ${reference.verse}` : '',
+    source,
+    chapter ? `Chapter ${chapter}` : '',
+    verse ? `Verse ${verse}` : '',
   ].filter(Boolean).join('  -  ');
 
-  const rawText = String(reference.text ?? '').trim();
+  const rawText = String(reference.text ?? reference.referenceText ?? '').trim();
+
+  if (!chapterVerse && !rawText) return null;
+
   const shouldTruncate = rawText.length > 100;
   const visibleText = shouldTruncate && !isExpanded ? `${rawText.slice(0, 100).trimEnd()}...` : rawText;
 

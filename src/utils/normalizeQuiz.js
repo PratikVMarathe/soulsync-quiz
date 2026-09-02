@@ -4,10 +4,10 @@ import { getDefaultHeroImageUrl, getVisualKey } from '../data/quizVisuals';
 const fallbackQuestion = previewQuiz.questions[0];
 const defaultPercentages = [72, 12, 8, 8];
 const defaultWisdom = {
-  title: 'Wisdom from the Gita',
+  title: '',
   verse: '',
   translation: '',
-  citation: 'Bhagavad Gita',
+  citation: '',
 };
 
 const parseDurationSeconds = (value, fallbackSeconds = 30) => {
@@ -28,15 +28,60 @@ const formatEstimatedTime = (seconds) => {
 
 const getIntroTitle = (title) => title?.replace(/^concept\s*\d+\s*:\s*/i, '').trim();
 
+export const getQuestionReferences = (question = {}) => {
+  const references = question.references ?? question.reference ?? [];
+  const rawList = Array.isArray(references) ? references.filter(Boolean) : references ? [references] : [];
+
+  return rawList
+    .map((ref) => {
+      if (typeof ref === 'string') {
+        const trimmed = ref.trim();
+        return trimmed ? { chapter: null, source: trimmed, text: '', verse: null } : null;
+      }
+      const source = String(ref.source || ref.referenceSource || '').trim();
+      const chapter = ref.chapter !== undefined && ref.chapter !== null && ref.chapter !== ''
+        ? Number(ref.chapter)
+        : ref.referenceChapter !== undefined && ref.referenceChapter !== null && ref.referenceChapter !== ''
+          ? Number(ref.referenceChapter)
+          : null;
+      const verse = ref.verse !== undefined && ref.verse !== null && ref.verse !== ''
+        ? Number(ref.verse)
+        : ref.referenceVerse !== undefined && ref.referenceVerse !== null && ref.referenceVerse !== ''
+          ? Number(ref.referenceVerse)
+          : null;
+      const text = String(ref.text || ref.referenceText || '').trim();
+
+      const validChapter = Number.isFinite(chapter) && chapter > 0 ? chapter : null;
+      const validVerse = Number.isFinite(verse) && verse > 0 ? verse : null;
+
+      if (!source && !validChapter && !validVerse && !text) return null;
+
+      return {
+        chapter: validChapter,
+        source,
+        text,
+        verse: validVerse,
+      };
+    })
+    .filter(Boolean);
+};
+
 const getWisdomCitation = (question) => {
   const primaryReference = getQuestionReferences(question)[0];
 
-  if (primaryReference?.source) {
+  if (primaryReference) {
+    const source = primaryReference.source || '';
     const chapterVerse = primaryReference.chapter && primaryReference.verse
       ? ` ${primaryReference.chapter}.${primaryReference.verse}`
-      : '';
+      : primaryReference.chapter
+        ? ` Chapter ${primaryReference.chapter}`
+        : primaryReference.verse
+          ? ` Verse ${primaryReference.verse}`
+          : '';
 
-    return `${primaryReference.source}${chapterVerse}`;
+    const combined = `${source}${chapterVerse}`.trim();
+    if (combined) return combined;
+    if (primaryReference.text) return primaryReference.text;
   }
 
   const tips = question.tips || '';
@@ -46,7 +91,7 @@ const getWisdomCitation = (question) => {
   const chapterCitation = tips.match(/Chapter\s*(\d+),?\s*Verse\s*(\d+)/i);
   if (chapterCitation) return `Bhagavad Gita ${chapterCitation[1]}.${chapterCitation[2]}`;
 
-  return defaultWisdom.citation;
+  return '';
 };
 
 const normalizeOption = (option, index) => {
@@ -60,12 +105,6 @@ const normalizeOption = (option, index) => {
   };
 };
 
-const getQuestionReferences = (question = {}) => {
-  const references = question.references ?? question.reference ?? [];
-  if (Array.isArray(references)) return references.filter(Boolean);
-  return references ? [references] : [];
-};
-
 const normalizeQuestion = (question = {}) => {
   const options = question.options?.length
     ? question.options.map(normalizeOption)
@@ -76,6 +115,8 @@ const normalizeQuestion = (question = {}) => {
     || question.tips
     || primaryReference?.text
     || fallbackQuestion.insight;
+  const citation = getWisdomCitation(question);
+  const translation = question.tips || question.explanation || primaryReference?.text || question.wisdom?.translation || '';
 
   return {
     id: question.id || question.questionId || question.text || question.prompt || question.title || fallbackQuestion.prompt,
@@ -89,9 +130,10 @@ const normalizeQuestion = (question = {}) => {
     references,
     timeRemainingSeconds: parseDurationSeconds(question.time, 30),
     wisdom: {
-      ...defaultWisdom,
-      translation: question.tips || question.explanation || primaryReference?.text || defaultWisdom.translation,
-      citation: getWisdomCitation(question),
+      title: question.wisdom?.title || (citation || translation ? 'Wisdom' : ''),
+      verse: question.wisdom?.verse || '',
+      translation,
+      citation,
       ...(question.wisdom || {}),
     },
   };

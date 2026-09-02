@@ -28,7 +28,15 @@ import {
 import { loadActiveQuizBySlug } from './services/quizLoaderService';
 import './index.css';
 
-export default function App({ user, quizId, onExit, isEmbedded = false }) {
+export default function App({
+  user,
+  quizId,
+  onExit,
+  onBack,
+  onComplete,
+  onReturn,
+  isEmbedded = false,
+}) {
   const isPreview = !quizId;
   const [quizData, setQuizData] = useState(isPreview ? previewQuiz : null);
   const [loading, setLoading] = useState(!isPreview);
@@ -384,9 +392,38 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
     return () => clearTimeout(timerId);
   }, [handleNext, handleSubmit, hasStarted, isTimeExpired, performSave, questionIndex, quiz?.totalQuestions, result, submittingAttempt]);
 
-  const handleExit = () => {
+  const handleBack = () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     performSave();
+
+    if (onBack) {
+      onBack();
+      return;
+    }
+
+    if (onExit) {
+      onExit();
+      return;
+    }
+
+    if (window.history.length > 1) {
+      window.history.back();
+    }
+  };
+
+  const handleReturn = () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    performSave();
+
+    if (onComplete) {
+      onComplete();
+      return;
+    }
+
+    if (onReturn) {
+      onReturn();
+      return;
+    }
 
     if (onExit) {
       onExit();
@@ -419,7 +456,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
       <QuizStatusView
         actions={[
           { label: 'Try Again', onClick: () => setReloadToken((currentToken) => currentToken + 1) },
-          { label: 'Go Back', onClick: handleExit, tone: 'secondary' },
+          { label: 'Go Back', onClick: handleBack, tone: 'secondary' },
         ]}
         isEmbedded={isEmbedded}
         state={error}
@@ -432,7 +469,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
       <QuizStatusView
         actions={[
           { label: 'Reload', onClick: () => window.location.reload() },
-          { label: 'Go Back', onClick: handleExit, tone: 'secondary' },
+          { label: 'Go Back', onClick: handleBack, tone: 'secondary' },
         ]}
         isEmbedded={isEmbedded}
         state={resolveQuizErrorState({
@@ -446,10 +483,10 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   if (viewMode === 'history') {
     return (
       <div className={`quiz-app${isEmbedded ? ' is-embedded' : ''}`}>
-        {!isEmbedded && <QuizTopbar user={user} onExit={handleExit} />}
+        {!isEmbedded && <QuizTopbar user={user} onExit={handleBack} />}
         {!isEmbedded && <QuizSidebar />}
         <QuizHistory 
-          onExit={handleExit}
+          onExit={handleBack}
           onGoToQuiz={handleShowQuiz}
           onRetake={handleShowQuiz}
           quiz={quiz} 
@@ -466,7 +503,7 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
         hasCompleted={hasCompletedAttempt}
         isEmbedded={isEmbedded}
         quiz={quiz}
-        onExit={handleExit}
+        onExit={handleBack}
         onStart={handleStartQuiz}
         starting={startingAttempt}
       />
@@ -476,10 +513,10 @@ export default function App({ user, quizId, onExit, isEmbedded = false }) {
   if (result) {
     return (
       <div className={`quiz-app${isEmbedded ? ' is-embedded' : ''}`}>
-        {!isEmbedded && <QuizTopbar user={user} onExit={handleExit} />}
+        {!isEmbedded && <QuizTopbar user={user} onExit={handleBack} />}
         {!isEmbedded && <QuizSidebar />}
 
-        <QuizResult onReturn={handleExit} quiz={quiz} result={result} />
+        <QuizResult onReturn={handleReturn} quiz={quiz} result={result} />
       </div>
     );
   }
