@@ -268,7 +268,7 @@ export default function App({
         }
       } else {
         const initialAnswers = createInitialAnswerState(quiz.questions);
-        const nextAttemptId = isPreview ? '' : await createQuizAttempt({ quiz, user });
+        const nextAttemptId = (!isPreview && user?.uid) ? await createQuizAttempt({ quiz, user }) : '';
 
         setAttemptId(nextAttemptId);
         setAnswerState(initialAnswers);
@@ -339,7 +339,7 @@ export default function App({
     setError(null);
 
     try {
-      if (!isPreview) {
+      if (!isPreview && user?.uid && attemptId) {
         await completeQuizAttempt({
           attemptId,
           currentQuestionIndex: questionIndex,

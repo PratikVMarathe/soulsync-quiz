@@ -26,12 +26,6 @@ export function isQuizAvailableNow(quiz, now = Date.now()) {
 }
 
 export async function loadActiveQuizBySlug(slug) {
-  await auth.authStateReady();
-
-  if (!auth.currentUser) {
-    throw new Error('Your sign-in session is not available in the quiz app. Please sign in again.');
-  }
-
   const quizSnapshot = await getDocs(query(
     collection(db, 'quizzes'),
     where('slug', '==', slug),
