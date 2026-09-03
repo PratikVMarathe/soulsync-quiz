@@ -17,13 +17,14 @@ describe('QuestionCard Component', () => {
     prompt: 'What is the most accessible tool to bring your mind back?',
   };
 
-  it('renders question prompt, options, and Check Answer button in initial state', () => {
+  it('renders question prompt, options in selectable state initially', () => {
+    const handleSelect = vi.fn();
+
     render(
       <QuestionCard
         isRevealed={false}
-        onCheckAnswer={vi.fn()}
         onNext={vi.fn()}
-        onSelectAnswer={vi.fn()}
+        onSelectAnswer={handleSelect}
         question={mockQuestion}
         selectedAnswer={null}
       />
@@ -33,40 +34,19 @@ describe('QuestionCard Component', () => {
     expect(screen.getByText('Your phone')).toBeInTheDocument();
     expect(screen.getByText('Your breath')).toBeInTheDocument();
 
-    const checkBtn = screen.getByRole('button', { name: /Check Answer/i });
-    expect(checkBtn).toBeInTheDocument();
-    expect(checkBtn).toBeDisabled();
+    const optionBtn = screen.getByRole('button', { name: /Your breath/i });
+    expect(optionBtn).not.toBeDisabled();
+
+    fireEvent.click(optionBtn);
+    expect(handleSelect).toHaveBeenCalledWith(1);
   });
 
-  it('enables Check Answer button when an option is selected', () => {
-    const handleSelect = vi.fn();
-    const handleCheck = vi.fn();
-
-    render(
-      <QuestionCard
-        isRevealed={false}
-        onCheckAnswer={handleCheck}
-        onNext={vi.fn()}
-        onSelectAnswer={handleSelect}
-        question={mockQuestion}
-        selectedAnswer={0}
-      />
-    );
-
-    const checkBtn = screen.getByRole('button', { name: /Check Answer/i });
-    expect(checkBtn).not.toBeDisabled();
-
-    fireEvent.click(checkBtn);
-    expect(handleCheck).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders correct green treatment and Next button when correct answer is checked', () => {
+  it('renders correct green treatment and Next button immediately when correct answer is revealed', () => {
     const handleNext = vi.fn();
 
     render(
       <QuestionCard
         isRevealed={true}
-        onCheckAnswer={vi.fn()}
         onNext={handleNext}
         onSelectAnswer={vi.fn()}
         question={mockQuestion}
@@ -84,11 +64,10 @@ describe('QuestionCard Component', () => {
     expect(handleNext).toHaveBeenCalledTimes(1);
   });
 
-  it('renders red treatment for wrong answer and highlights correct answer in green', () => {
+  it('renders red treatment for wrong answer and highlights correct answer in green immediately', () => {
     render(
       <QuestionCard
         isRevealed={true}
-        onCheckAnswer={vi.fn()}
         onNext={vi.fn()}
         onSelectAnswer={vi.fn()}
         question={mockQuestion}
@@ -105,7 +84,6 @@ describe('QuestionCard Component', () => {
       <QuestionCard
         isRevealed={false}
         isTimeExpired={true}
-        onCheckAnswer={vi.fn()}
         onNext={vi.fn()}
         onSelectAnswer={vi.fn()}
         question={mockQuestion}
@@ -122,7 +100,6 @@ describe('QuestionCard Component', () => {
       <QuestionCard
         isRevealed={true}
         isTimeExpired={true}
-        onCheckAnswer={vi.fn()}
         onNext={vi.fn()}
         onSelectAnswer={vi.fn()}
         question={mockQuestion}
