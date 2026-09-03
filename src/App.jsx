@@ -157,7 +157,7 @@ export default function App({
 
     if (bgMusicRef.current && bgMusicRef.current.getAttribute('data-src') === musicSrc) {
       if (bgMusicRef.current.paused) {
-        bgMusicRef.current.play().catch(() => {});
+        bgMusicRef.current.play().catch(() => { });
       }
       return undefined;
     }
@@ -184,7 +184,7 @@ export default function App({
 
       audio.addEventListener('ended', () => {
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
       });
     } catch {
       // Audio optional
