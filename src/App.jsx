@@ -301,26 +301,7 @@ export default function App({
   const handleSelectAnswer = useCallback((answerIndex) => {
     if (result || submittingAttempt || isAnswerRevealed || isTimeExpired) return;
 
-    setAnswerState((currentAnswers) => {
-      const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
-        answeredAt: Date.now(),
-        selectedIndex: answerIndex,
-        visited: true,
-      });
-
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        performSave(updated, questionIndex);
-      }, 1500);
-
-      return updated;
-    });
-  }, [isAnswerRevealed, isTimeExpired, performSave, questionIndex, result, submittingAttempt]);
-
-  const handleCheckAnswer = useCallback(() => {
-    if (result || submittingAttempt || selectedAnswer === null || isAnswerRevealed) return;
-
-    const isCorrect = (selectedAnswer === question?.correctAnswer);
+    const isCorrect = (answerIndex === question?.correctAnswer);
     if (isCorrect) {
       playCorrectSound();
     } else {
@@ -331,13 +312,14 @@ export default function App({
       const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
         answeredAt: Date.now(),
         isRevealed: true,
+        selectedIndex: answerIndex,
         visited: true,
       });
 
       performSave(updated, questionIndex);
       return updated;
     });
-  }, [isAnswerRevealed, performSave, question?.correctAnswer, questionIndex, result, selectedAnswer, submittingAttempt]);
+  }, [isAnswerRevealed, isTimeExpired, performSave, question?.correctAnswer, questionIndex, result, submittingAttempt]);
 
   useEffect(() => {
     if (!hasStarted || result || !question) return undefined;
@@ -648,7 +630,6 @@ export default function App({
               isRevealed={isAnswerRevealed}
               isSubmitting={submittingAttempt}
               isTimeExpired={isTimeExpired}
-              onCheckAnswer={handleCheckAnswer}
               onNext={handleNext}
               onSelectAnswer={handleSelectAnswer}
               question={question}

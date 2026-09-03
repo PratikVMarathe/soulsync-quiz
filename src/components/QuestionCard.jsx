@@ -15,7 +15,6 @@ export default function QuestionCard({
   isRevealed = false,
   isSubmitting = false,
   isTimeExpired = false,
-  onCheckAnswer,
   onNext,
   onSelectAnswer,
   question,
@@ -88,18 +87,8 @@ export default function QuestionCard({
         </div>
       ) : null}
 
-      <div className="quiz-runtime-actions">
-        {!isLocked ? (
-          <button
-            className="quiz-next-button"
-            disabled={selectedAnswer === null || isSubmitting}
-            onClick={onCheckAnswer}
-            type="button"
-          >
-            <span>Check Answer</span>
-            <Icon name="spark" size={20} />
-          </button>
-        ) : (
+      {isLocked ? (
+        <div className="quiz-runtime-actions">
           <button
             className="quiz-next-button"
             disabled={isSubmitting}
@@ -109,8 +98,8 @@ export default function QuestionCard({
             <span>{isSubmitting ? 'Submitting...' : 'Next'}</span>
             <Icon name="arrow" size={20} />
           </button>
-        )}
-      </div>
+        </div>
+      ) : null}
     </article>
   );
 }
