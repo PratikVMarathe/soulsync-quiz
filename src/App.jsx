@@ -26,6 +26,8 @@ import {
   setAnswerAtIndex,
 } from './utils/quizAttempt';
 import { loadActiveQuizBySlug } from './services/quizLoaderService';
+import { DEFAULT_BACKGROUND_VOLUME, QUIZ_MUSIC } from './constants/audio';
+import { playCorrectSound, playWrongSound } from './utils/audio';
 import './index.css';
 
 export default function App({
@@ -53,12 +55,13 @@ export default function App({
   const [questionIndex, setQuestionIndex] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  
+
   const searchParams = new URLSearchParams(window.location.search);
   const initialViewMode = searchParams.get('view') || 'quiz';
   const [viewMode, setViewMode] = useState(initialViewMode);
-  
+
   const saveTimeoutRef = useRef(null);
+  const bgMusicRef = useRef(null);
 
   useEffect(() => {
     if (!quizId) return undefined;
@@ -97,10 +100,10 @@ export default function App({
         if (!ignoreResult) {
           setError(resolveQuizErrorState(fetchError, fetchError.code === 'permission-denied'
             ? {
-                message: 'Your account does not have permission to read this concept. Check the Firestore rules for quizzes.',
-                statusCode: 403,
-                title: 'Concept Access Restricted',
-              }
+              message: 'Your account does not have permission to read this concept. Check the Firestore rules for quizzes.',
+              statusCode: 403,
+              title: 'Concept Access Restricted',
+            }
             : undefined));
         }
       } finally {
@@ -115,10 +118,93 @@ export default function App({
     };
   }, [quizId, reloadToken, user?.uid, isPreview]);
 
+  const isPlaying = hasStarted && !result && !loading && !error && viewMode === 'quiz';
+
+  useEffect(() => {
+    if (isPlaying) {
+      document.body.classList.add('soulsync-quiz-active');
+    } else {
+      document.body.classList.remove('soulsync-quiz-active');
+    }
+
+    return () => {
+      document.body.classList.remove('soulsync-quiz-active');
+    };
+  }, [isPlaying]);
+
+  // Background music lifecycle management
+  useEffect(() => {
+    if (!hasStarted || result || submittingAttempt || viewMode !== 'quiz') {
+      if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current.src = '';
+        bgMusicRef.current = null;
+      }
+      return undefined;
+    }
+
+    const slug = quizData?.slug || quizId;
+    const musicSrc = slug ? QUIZ_MUSIC[slug] : null;
+
+    if (!musicSrc) {
+      if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current.src = '';
+        bgMusicRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (bgMusicRef.current && bgMusicRef.current.getAttribute('data-src') === musicSrc) {
+      if (bgMusicRef.current.paused) {
+        bgMusicRef.current.play().catch(() => {});
+      }
+      return undefined;
+    }
+
+    if (bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      bgMusicRef.current.src = '';
+      bgMusicRef.current = null;
+    }
+
+    try {
+      const audio = new Audio(musicSrc);
+      audio.volume = DEFAULT_BACKGROUND_VOLUME;
+      audio.loop = true;
+      audio.setAttribute('data-src', musicSrc);
+      bgMusicRef.current = audio;
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Autoplay policy prevented playback, ignore safely
+        });
+      }
+
+      audio.addEventListener('ended', () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      });
+    } catch {
+      // Audio optional
+    }
+
+    return () => {
+      if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current.src = '';
+        bgMusicRef.current = null;
+      }
+    };
+  }, [hasStarted, quizData?.slug, quizId, result, submittingAttempt, viewMode]);
+
   const quiz = useMemo(() => normalizeQuiz(quizData), [quizData]);
   const question = quiz?.questions[questionIndex];
-  const selectedAnswer = answerState[questionIndex]?.selectedIndex ?? null;
-  const isTimeExpired = (answerState[questionIndex]?.remainingSeconds <= 0);
+  const currentAnswer = answerState[questionIndex];
+  const selectedAnswer = currentAnswer?.selectedIndex ?? null;
+  const isAnswerRevealed = Boolean(currentAnswer?.isRevealed);
+  const isTimeExpired = (currentAnswer?.remainingSeconds <= 0);
 
   const performSave = useCallback(async (customAnswers, customIndex, customRemaining, isResumeCall = false) => {
     if (isPreview || !attemptId || !user?.uid || result || submittingAttempt) return;
@@ -172,27 +258,48 @@ export default function App({
     };
   }, [hasStarted, performSave, result, submittingAttempt]);
 
+  // Timer countdown and expiration handling
   useEffect(() => {
     if (!hasStarted || result || submittingAttempt || isPaused || !quiz) return undefined;
 
     const intervalId = setInterval(() => {
       setAnswerState((currentAnswers) => {
         const currentAns = currentAnswers[questionIndex];
-        if (!currentAns || currentAns.remainingSeconds <= 0) return currentAnswers;
+        if (!currentAns || isAnswerRevealed || currentAns.remainingSeconds <= 0) return currentAnswers;
 
-        return setAnswerAtIndex(currentAnswers, questionIndex, {
-          remainingSeconds: Math.max(0, currentAns.remainingSeconds - 1),
+        const nextRemaining = Math.max(0, currentAns.remainingSeconds - 1);
+        const shouldExpire = nextRemaining <= 0;
+
+        if (shouldExpire) {
+          const currentSelection = currentAns.selectedIndex;
+          const isCorrect = currentSelection !== null && currentSelection === question?.correctAnswer;
+          if (isCorrect) {
+            playCorrectSound();
+          } else {
+            playWrongSound();
+          }
+        }
+
+        const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
+          isRevealed: shouldExpire ? true : Boolean(currentAns.isRevealed),
+          remainingSeconds: nextRemaining,
           timeTaken: (currentAns.timeTaken || 0) + 1,
         });
+
+        if (shouldExpire) {
+          performSave(updated, questionIndex, 0);
+        }
+
+        return updated;
       });
       setTotalTimeTaken((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [hasStarted, isPaused, questionIndex, quiz, result, submittingAttempt]);
+  }, [hasStarted, isAnswerRevealed, isPaused, performSave, question?.correctAnswer, questionIndex, quiz, result, submittingAttempt]);
 
   const handleSelectAnswer = useCallback((answerIndex) => {
-    if (result || submittingAttempt || isTimeExpired) return;
+    if (result || submittingAttempt || isAnswerRevealed || isTimeExpired) return;
 
     setAnswerState((currentAnswers) => {
       const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
@@ -208,21 +315,46 @@ export default function App({
 
       return updated;
     });
-  }, [isTimeExpired, performSave, questionIndex, result, submittingAttempt]);
+  }, [isAnswerRevealed, isTimeExpired, performSave, questionIndex, result, submittingAttempt]);
+
+  const handleCheckAnswer = useCallback(() => {
+    if (result || submittingAttempt || selectedAnswer === null || isAnswerRevealed) return;
+
+    const isCorrect = (selectedAnswer === question?.correctAnswer);
+    if (isCorrect) {
+      playCorrectSound();
+    } else {
+      playWrongSound();
+    }
+
+    setAnswerState((currentAnswers) => {
+      const updated = setAnswerAtIndex(currentAnswers, questionIndex, {
+        answeredAt: Date.now(),
+        isRevealed: true,
+        visited: true,
+      });
+
+      performSave(updated, questionIndex);
+      return updated;
+    });
+  }, [isAnswerRevealed, performSave, question?.correctAnswer, questionIndex, result, selectedAnswer, submittingAttempt]);
 
   useEffect(() => {
     if (!hasStarted || result || !question) return undefined;
 
     const handleKeyboardAnswer = (event) => {
-      const answerIndex = Number(event.key) - 1;
+      const keyNumber = Number(event.key);
+      const answerIndex = keyNumber - 1;
       if (answerIndex >= 0 && answerIndex < question.options.length) {
-        handleSelectAnswer(answerIndex);
+        if (!isAnswerRevealed && !isTimeExpired) {
+          handleSelectAnswer(answerIndex);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyboardAnswer);
     return () => window.removeEventListener('keydown', handleKeyboardAnswer);
-  }, [handleSelectAnswer, hasStarted, question, result]);
+  }, [handleSelectAnswer, hasStarted, isAnswerRevealed, isTimeExpired, question, result]);
 
   const handleStartQuiz = async () => {
     if (!quiz) return;
@@ -239,11 +371,13 @@ export default function App({
 
         const normalizedAnswers = quiz.questions.map((q, idx) => {
           const saved = restoredAnswers[idx] || {};
+          const hasSavedSelection = Number.isInteger(saved.selectedIndex);
           return {
             answeredAt: saved.answeredAt ?? null,
+            isRevealed: Boolean(saved.isRevealed || hasSavedSelection),
             questionId: q.id || `q${idx + 1}`,
             remainingSeconds: Number.isInteger(saved.remainingSeconds) ? saved.remainingSeconds : Number(q.timeRemainingSeconds ?? 30),
-            selectedIndex: Number.isInteger(saved.selectedIndex) ? saved.selectedIndex : null,
+            selectedIndex: hasSavedSelection ? saved.selectedIndex : null,
             timeTaken: Number(saved.timeTaken) || 0,
             visited: Boolean(saved.visited || idx === restoredIndex),
           };
@@ -281,44 +415,18 @@ export default function App({
       console.error('Failed to start quiz attempt:', startError);
       setError(resolveQuizErrorState(startError, startError.code === 'permission-denied'
         ? {
-            message: 'Firestore blocked creating your quiz attempt. Check rules for users/{uid}/quizAttempts.',
-            statusCode: 403,
-            title: 'Attempt Access Restricted',
-          }
+          message: 'Firestore blocked creating your quiz attempt. Check rules for users/{uid}/quizAttempts.',
+          statusCode: 403,
+          title: 'Attempt Access Restricted',
+        }
         : {
-            message: startError.message || 'We could not start this quiz attempt right now. Please try again.',
-            title: 'Could Not Start Quiz',
-          }));
+          message: startError.message || 'We could not start this quiz attempt right now. Please try again.',
+          title: 'Could Not Start Quiz',
+        }));
     } finally {
       setStartingAttempt(false);
     }
   };
-
-  const handlePrevious = useCallback(() => {
-    if (questionIndex <= 0) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    const prevIndex = questionIndex - 1;
-    setAnswerState((current) => {
-      const updated = setAnswerAtIndex(current, prevIndex, { visited: true });
-      performSave(updated, prevIndex);
-      return updated;
-    });
-    setQuestionIndex(prevIndex);
-  }, [performSave, questionIndex]);
-
-  const handleNext = useCallback(() => {
-    if (!quiz || questionIndex >= quiz.totalQuestions - 1) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    const nextIndex = questionIndex + 1;
-    setAnswerState((current) => {
-      const updated = setAnswerAtIndex(current, nextIndex, { visited: true });
-      performSave(updated, nextIndex);
-      return updated;
-    });
-    setQuestionIndex(nextIndex);
-  }, [performSave, questionIndex, quiz]);
 
   const handleSubmit = useCallback(async () => {
     if (!quiz || submittingAttempt) return;
@@ -351,6 +459,7 @@ export default function App({
 
       setAnswerState(attemptAnswers.map((answer) => ({
         answeredAt: answer.answeredAt,
+        isRevealed: true,
         remainingSeconds: answer.remainingSeconds,
         selectedIndex: answer.selectedIndex,
         timeTaken: answer.timeTaken,
@@ -363,34 +472,36 @@ export default function App({
       console.error('Failed to submit quiz attempt:', submitError);
       setError(resolveQuizErrorState(submitError, submitError.code === 'permission-denied'
         ? {
-            message: 'Firestore blocked completing your quiz attempt. Check rules for users/{uid}/quizAttempts.',
-            statusCode: 403,
-            title: 'Could Not Save Result',
-          }
+          message: 'Firestore blocked completing your quiz attempt. Check rules for users/{uid}/quizAttempts.',
+          statusCode: 403,
+          title: 'Could Not Save Result',
+        }
         : {
-            message: 'We could not save your quiz result right now. Please try again.',
-            title: 'Could Not Submit Quiz',
-          }));
+          message: 'We could not save your quiz result right now. Please try again.',
+          title: 'Could Not Submit Quiz',
+        }));
     } finally {
       setSubmittingAttempt(false);
     }
   }, [answerState, attemptId, isPreview, questionIndex, quiz, submittingAttempt, totalTimeTaken, user]);
 
-  useEffect(() => {
-    if (!hasStarted || result || submittingAttempt || !isTimeExpired) return undefined;
+  const handleNext = useCallback(() => {
+    if (!quiz || submittingAttempt) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    performSave();
+    if (questionIndex >= quiz.totalQuestions - 1) {
+      handleSubmit();
+      return;
+    }
 
-    const timerId = setTimeout(() => {
-      if (questionIndex < (quiz?.totalQuestions || 1) - 1) {
-        handleNext();
-      } else {
-        handleSubmit();
-      }
-    }, 3000);
-
-    return () => clearTimeout(timerId);
-  }, [handleNext, handleSubmit, hasStarted, isTimeExpired, performSave, questionIndex, quiz?.totalQuestions, result, submittingAttempt]);
+    const nextIndex = questionIndex + 1;
+    setAnswerState((current) => {
+      const updated = setAnswerAtIndex(current, nextIndex, { visited: true });
+      performSave(updated, nextIndex);
+      return updated;
+    });
+    setQuestionIndex(nextIndex);
+  }, [handleSubmit, performSave, questionIndex, quiz, submittingAttempt]);
 
   const handleBack = () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -485,12 +596,12 @@ export default function App({
       <div className={`quiz-app${isEmbedded ? ' is-embedded' : ''}`}>
         {!isEmbedded && <QuizTopbar user={user} onExit={handleBack} />}
         {!isEmbedded && <QuizSidebar />}
-        <QuizHistory 
+        <QuizHistory
           onExit={handleBack}
           onGoToQuiz={handleShowQuiz}
           onRetake={handleShowQuiz}
-          quiz={quiz} 
-          user={user} 
+          quiz={quiz}
+          user={user}
         />
       </div>
     );
@@ -522,8 +633,8 @@ export default function App({
   }
 
   return (
-    <div className={`quiz-app${isEmbedded ? ' is-embedded' : ''}`}>
-      {!isEmbedded && <QuizTopbar user={user} onExit={handleExit} />}
+    <div className={`quiz-app${isPlaying ? ' is-playing' : ''}${isEmbedded ? ' is-embedded' : ''}`}>
+      {!isEmbedded && <QuizTopbar user={user} onExit={handleBack} />}
       {!isEmbedded && <QuizSidebar />}
 
       <main className={`quiz-main${isEmbedded ? ' is-embedded' : ''}`}>
@@ -534,17 +645,14 @@ export default function App({
               totalQuestions={quiz.totalQuestions}
             />
             <QuestionCard
-              canGoNext={questionIndex < quiz.totalQuestions - 1}
-              canGoPrevious={questionIndex > 0}
-              isLastQuestion={questionIndex === quiz.totalQuestions - 1}
+              isRevealed={isAnswerRevealed}
               isSubmitting={submittingAttempt}
               isTimeExpired={isTimeExpired}
-              question={question}
-              selectedAnswer={selectedAnswer}
-              onPrevious={handlePrevious}
+              onCheckAnswer={handleCheckAnswer}
               onNext={handleNext}
               onSelectAnswer={handleSelectAnswer}
-              onSubmit={handleSubmit}
+              question={question}
+              selectedAnswer={selectedAnswer}
             />
             {submittingAttempt ? (
               <div className="quiz-submit-state">Saving your result...</div>
@@ -553,7 +661,7 @@ export default function App({
 
           <aside aria-label="Quiz support" className="quiz-support-column">
             <TimerCard seconds={answerState[questionIndex]?.remainingSeconds ?? 0} />
-            <AiGuideCard />
+            {/* <AiGuideCard /> */}
           </aside>
         </section>
       </main>

@@ -5,7 +5,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { db } from '../config/firebase';
 
 function toMillis(value) {
   if (!value) return null;

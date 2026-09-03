@@ -12,6 +12,7 @@ export function createInitialAnswerState(questionsOrCount) {
     const question = isArray ? questionsOrCount[index] : null;
     return {
       answeredAt: null,
+      isRevealed: false,
       questionId: question?.id || `q${index + 1}`,
       remainingSeconds: Number(question?.timeRemainingSeconds ?? 30),
       selectedIndex: null,
@@ -48,6 +49,7 @@ export function buildAttemptAnswers({ answers, currentElapsedSeconds = 0, curren
       answeredAt: answer.answeredAt ?? null,
       correctIndex: question.correctAnswer,
       isCorrect: selectedIndex !== null && selectedIndex === question.correctAnswer,
+      isRevealed: Boolean(answer.isRevealed ?? (selectedIndex !== null)),
       questionId: question.id || `q${index + 1}`,
       remainingSeconds,
       selectedIndex,
@@ -60,6 +62,7 @@ export function buildAttemptAnswers({ answers, currentElapsedSeconds = 0, curren
 export function formatAnswersForFirestore(answers = []) {
   return answers.map((answer, index) => ({
     answeredAt: answer.answeredAt ?? null,
+    isRevealed: Boolean(answer.isRevealed ?? (answer.selectedIndex !== null)),
     questionId: answer.questionId || `q${index + 1}`,
     remainingSeconds: Number(answer.remainingSeconds ?? 0),
     selectedIndex: Number.isInteger(answer.selectedIndex) ? answer.selectedIndex : null,
