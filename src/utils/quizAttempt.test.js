@@ -17,9 +17,9 @@ describe('quizAttempt utilities', () => {
       const state = createInitialAnswerState(3);
       expect(state).toHaveLength(3);
       expect(state).toEqual([
-        { answeredAt: null, questionId: 'q1', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: true },
-        { answeredAt: null, questionId: 'q2', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false },
-        { answeredAt: null, questionId: 'q3', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false },
+        { answeredAt: null, isRevealed: false, questionId: 'q1', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: true },
+        { answeredAt: null, isRevealed: false, questionId: 'q2', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false },
+        { answeredAt: null, isRevealed: false, questionId: 'q3', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false },
       ]);
     });
   });
@@ -42,9 +42,9 @@ describe('quizAttempt utilities', () => {
     it('updates the answer object at the target index immutably', () => {
       const initial = createInitialAnswerState(2);
       const updated = setAnswerAtIndex(initial, 1, { remainingSeconds: 15, selectedIndex: 2, timeTaken: 15 });
-      expect(updated[0]).toEqual({ answeredAt: null, questionId: 'q1', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: true });
-      expect(updated[1]).toEqual({ answeredAt: null, questionId: 'q2', remainingSeconds: 15, selectedIndex: 2, timeTaken: 15, visited: false });
-      expect(initial[1]).toEqual({ answeredAt: null, questionId: 'q2', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false });
+      expect(updated[0]).toEqual({ answeredAt: null, isRevealed: false, questionId: 'q1', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: true });
+      expect(updated[1]).toEqual({ answeredAt: null, isRevealed: false, questionId: 'q2', remainingSeconds: 15, selectedIndex: 2, timeTaken: 15, visited: false });
+      expect(initial[1]).toEqual({ answeredAt: null, isRevealed: false, questionId: 'q2', remainingSeconds: 30, selectedIndex: null, timeTaken: 0, visited: false });
     });
   });
 
@@ -57,9 +57,9 @@ describe('quizAttempt utilities', () => {
 
     it('builds full answer list with correctness checking and remaining seconds calculation', () => {
       const answers = [
-        { answeredAt: 1690000000000, remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
-        { answeredAt: 1690000005000, remainingSeconds: 25, selectedIndex: 0, timeTaken: 5, visited: false },
-        { answeredAt: null, selectedIndex: null, timeTaken: 0, visited: true },
+        { answeredAt: 1690000000000, isRevealed: true, remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
+        { answeredAt: 1690000005000, isRevealed: true, remainingSeconds: 25, selectedIndex: 0, timeTaken: 5, visited: false },
+        { answeredAt: null, isRevealed: false, selectedIndex: null, timeTaken: 0, visited: true },
       ];
 
       const result = buildAttemptAnswers({
@@ -73,6 +73,7 @@ describe('quizAttempt utilities', () => {
         answeredAt: 1690000000000,
         correctIndex: 1,
         isCorrect: true,
+        isRevealed: true,
         questionId: 'q1',
         remainingSeconds: 20,
         selectedIndex: 1,
@@ -83,6 +84,7 @@ describe('quizAttempt utilities', () => {
         answeredAt: 1690000005000,
         correctIndex: 2,
         isCorrect: false,
+        isRevealed: true,
         questionId: 'q2',
         remainingSeconds: 25,
         selectedIndex: 0,
@@ -93,6 +95,7 @@ describe('quizAttempt utilities', () => {
         answeredAt: null,
         correctIndex: 0,
         isCorrect: false,
+        isRevealed: false,
         questionId: 'q3',
         remainingSeconds: 18, // 30 - (0 + 12)
         selectedIndex: null,
@@ -151,11 +154,11 @@ describe('quizAttempt utilities', () => {
   describe('formatAnswersForFirestore', () => {
     it('strips evaluation properties like correctIndex and isCorrect while preserving runtime data', () => {
       const evaluatedAnswers = [
-        { answeredAt: 12345, correctIndex: 1, isCorrect: true, questionId: 'q1', remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
+        { answeredAt: 12345, correctIndex: 1, isCorrect: true, isRevealed: true, questionId: 'q1', remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
       ];
       const result = formatAnswersForFirestore(evaluatedAnswers);
       expect(result).toEqual([
-        { answeredAt: 12345, questionId: 'q1', remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
+        { answeredAt: 12345, isRevealed: true, questionId: 'q1', remainingSeconds: 20, selectedIndex: 1, timeTaken: 10, visited: true },
       ]);
     });
   });

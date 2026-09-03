@@ -3,12 +3,6 @@ import { getDefaultHeroImageUrl, getVisualKey } from '../data/quizVisuals';
 
 const fallbackQuestion = previewQuiz.questions[0];
 const defaultPercentages = [72, 12, 8, 8];
-const defaultWisdom = {
-  title: '',
-  verse: '',
-  translation: '',
-  citation: '',
-};
 
 const parseDurationSeconds = (value, fallbackSeconds = 30) => {
   if (Number.isFinite(Number(value))) return Number(value);

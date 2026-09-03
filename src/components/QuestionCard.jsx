@@ -1,9 +1,10 @@
 import Icon from './Icon';
 
-const getOptionClassName = ({ answerIndex, correctAnswer, isSubmitted, selectedAnswer }) => {
-  if (isSubmitted) {
+const getOptionClassName = ({ answerIndex, correctAnswer, isRevealed, isTimeExpired, selectedAnswer }) => {
+  const isLocked = isRevealed || isTimeExpired;
+  if (isLocked) {
     if (answerIndex === correctAnswer) return ' is-correct';
-    if (answerIndex === selectedAnswer) return ' is-incorrect';
+    if (selectedAnswer !== null && answerIndex === selectedAnswer) return ' is-incorrect';
     return '';
   }
 
@@ -11,21 +12,17 @@ const getOptionClassName = ({ answerIndex, correctAnswer, isSubmitted, selectedA
 };
 
 export default function QuestionCard({
-  canGoNext,
-  canGoPrevious,
-  isLastQuestion,
-  isSubmitted = false,
+  isRevealed = false,
   isSubmitting = false,
   isTimeExpired = false,
+  onCheckAnswer,
   onNext,
-  onPrevious,
   onSelectAnswer,
-  onSubmit,
   question,
   selectedAnswer,
 }) {
-  const hasSelectedAnswer = selectedAnswer !== null;
-  const disableOptions = isSubmitted || isTimeExpired;
+  const isLocked = isRevealed || isTimeExpired;
+  const disableOptions = isLocked || isSubmitting;
 
   return (
     <article className="quiz-question-card">
@@ -36,7 +33,13 @@ export default function QuestionCard({
 
       <h1>{question.prompt}</h1>
       <p className="quiz-question-helper">
-        {isSubmitted ? 'Here is the best answer' : isTimeExpired ? 'Time has expired for this question' : 'Choose the best answer'}
+        {isLocked
+          ? selectedAnswer === null
+            ? 'Time has expired — marked as skipped. Here is the correct answer'
+            : selectedAnswer === question.correctAnswer
+              ? 'Correct answer!'
+              : 'Here is the correct answer'
+          : 'Choose the best answer'}
       </p>
 
       <div className="quiz-options">
@@ -44,7 +47,8 @@ export default function QuestionCard({
           const optionClassName = getOptionClassName({
             answerIndex: index,
             correctAnswer: question.correctAnswer,
-            isSubmitted,
+            isRevealed,
+            isTimeExpired,
             selectedAnswer,
           });
           return (
@@ -68,60 +72,45 @@ export default function QuestionCard({
         })}
       </div>
 
-      {!isSubmitted && isTimeExpired ? (
+      {isTimeExpired && selectedAnswer === null ? (
         <div className="quiz-insight is-result">
           <Icon name="timer" size={29} />
           <div>
-            <p><strong>Time Expired:</strong> {selectedAnswer === null ? 'No answer was selected (Marked as Skipped).' : 'Your selected answer is locked.'} Advancing to next screen shortly...</p>
-            {/* {question.insight && (
-              <p style={{ marginTop: '0.5rem' }}><strong>Reflection:</strong> {question.insight}</p>
-            )} */}
-            {question.wisdom?.translation && (
-              <p style={{ marginTop: '0.5rem' }}><strong>{question.wisdom.citation || 'Gita Wisdom'}:</strong> {question.wisdom.translation}</p>
-            )}
+            <p><strong>Time Expired:</strong> No answer was selected in time (marked as skipped). The correct answer is highlighted in green above.</p>
           </div>
         </div>
       ) : null}
 
-      {isSubmitted ? (
-        <>
-          <div className="quiz-insight">
-            <Icon name="spark" size={29} />
-            <p><strong>Insight:</strong> {question.insight}</p>
-          </div>
-        </>
+      {isLocked && question.insight ? (
+        <div className="quiz-insight">
+          <Icon name="spark" size={29} />
+          <p><strong>Insight:</strong> {question.insight}</p>
+        </div>
       ) : null}
 
-      {!isSubmitted ? (
-        <div className="quiz-runtime-actions">
+      <div className="quiz-runtime-actions">
+        {!isLocked ? (
           <button
-            className="quiz-secondary-button"
-            disabled={!canGoPrevious}
-            onClick={onPrevious}
+            className="quiz-next-button"
+            disabled={selectedAnswer === null || isSubmitting}
+            onClick={onCheckAnswer}
             type="button"
           >
-            Previous
+            <span>Check Answer</span>
+            <Icon name="spark" size={20} />
           </button>
-
-          {!isLastQuestion ? (
-            <button
-              className="quiz-next-button"
-              disabled={!canGoNext}
-              onClick={onNext}
-              type="button"
-            >
-              <span>{hasSelectedAnswer ? 'Next' : 'Skip'}</span>
-              <Icon name="arrow" size={20} />
-            </button>
-          ) : (
-            <button className="quiz-next-button" disabled={isSubmitting} onClick={onSubmit} type="button">
-              <span>{isSubmitting ? 'Submitting...' : 'Submit Quiz'}</span>
-              <Icon name="arrow" size={20} />
-            </button>
-          )}
-        </div>
-      ) : null}
+        ) : (
+          <button
+            className="quiz-next-button"
+            disabled={isSubmitting}
+            onClick={onNext}
+            type="button"
+          >
+            <span>{isSubmitting ? 'Submitting...' : 'Next'}</span>
+            <Icon name="arrow" size={20} />
+          </button>
+        )}
+      </div>
     </article>
   );
 }
-

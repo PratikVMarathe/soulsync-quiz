@@ -30,9 +30,10 @@ function QuestionStatus({ item }) {
 }
 
 function ReferenceCard({ reference }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (!reference) return null;
 
-  const [isExpanded, setIsExpanded] = useState(false);
   const source = reference.source || reference.referenceSource || '';
   const chapter = reference.chapter ?? reference.referenceChapter ?? '';
   const verse = reference.verse ?? reference.referenceVerse ?? '';
