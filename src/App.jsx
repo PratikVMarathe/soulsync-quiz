@@ -6,6 +6,7 @@ import ProgressHeader from './components/ProgressHeader';
 import QuizResult from './components/QuizResult';
 import QuizStatusView from './components/QuizStatusView';
 import QuestionCard from './components/QuestionCard';
+import QuizCompletionModal from './components/QuizCompletionModal';
 import QuizIntro from './components/QuizIntro';
 import QuizHistory from './components/QuizHistory';
 import QuizSidebar from './components/QuizSidebar';
@@ -37,6 +38,7 @@ export default function App({
   onBack,
   onComplete,
   onReturn,
+  onExploreGitaClass,
   isEmbedded = false,
 }) {
   const isPreview = !quizId;
@@ -52,6 +54,7 @@ export default function App({
   const [totalTimeTaken, setTotalTimeTaken] = useState(0);
   const [answerState, setAnswerState] = useState([]);
   const [result, setResult] = useState(null);
+  const [showCompletionChoice, setShowCompletionChoice] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -450,6 +453,24 @@ export default function App({
       setResult(nextResult);
       setExistingActiveAttempt(null);
       setHasCompletedAttempt(true);
+
+      // Quiz Completion Flow (Conditional Logic):
+      // Check localStorage for 'hasRegisteredGitaClass'.
+      // If 'true' (already registered), do NOT show QuizCompletionModal; transition directly to Quiz Results page.
+      // If null or false (not registered), display QuizCompletionModal.
+      let hasRegisteredGitaClass = false;
+      try {
+        hasRegisteredGitaClass = typeof window !== 'undefined'
+          && window.localStorage?.getItem('hasRegisteredGitaClass') === 'true';
+      } catch (storageErr) {
+        console.warn('Failed to read hasRegisteredGitaClass from localStorage:', storageErr);
+      }
+
+      if (!hasRegisteredGitaClass) {
+        setShowCompletionChoice(true);
+      } else {
+        setShowCompletionChoice(false);
+      }
     } catch (submitError) {
       console.error('Failed to submit quiz attempt:', submitError);
       setError(resolveQuizErrorState(submitError, submitError.code === 'permission-denied'
@@ -610,6 +631,20 @@ export default function App({
         {!isEmbedded && <QuizSidebar />}
 
         <QuizResult onReturn={handleReturn} quiz={quiz} result={result} />
+
+        {showCompletionChoice && (typeof window === 'undefined' || window.localStorage?.getItem('hasRegisteredGitaClass') !== 'true') ? (
+          <QuizCompletionModal
+            onExploreGitaClass={() => {
+              setShowCompletionChoice(false);
+              if (onExploreGitaClass) {
+                onExploreGitaClass();
+              }
+            }}
+            onViewResult={() => {
+              setShowCompletionChoice(false);
+            }}
+          />
+        ) : null}
       </div>
     );
   }
